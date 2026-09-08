@@ -7,8 +7,10 @@ const phase=label=>console.log('SMOKE phase: '+label);
 phase('temporary profile configured');
 let done=false;
 const timeout=setTimeout(()=>finish(Error('Desktop smoke test timed out')),30000);
-function finish(error){if(done)return;done=true;clearTimeout(timeout);console.log(error?'FAIL desktop smoke: '+error.message:'PASS desktop smoke: isolated wallet lifecycle, UI, RPC/history and sandboxed dApp provider/alias');app.exit(error?1:0);}
-process.on('exit',()=>{fs.rmSync(profile,{recursive:true,force:true});});
+function finish(error){if(done)return;done=true;clearTimeout(timeout);console.log(error?'FAIL desktop smoke: '+error.message:'PASS desktop smoke: isolated wallet lifecycle, UI, RPC/history and sandboxed dApp provider/alias');if(error)app.exit(1);else app.quit();}
+app.on('before-quit',()=>phase('normal quit requested'));
+app.on('will-quit',()=>phase('windows closed; app will quit'));
+process.on('exit',()=>{phase('process exit; removing temporary profile');fs.rmSync(profile,{recursive:true,force:true});phase('temporary profile removed');});
 app.on('browser-window-created',(_event,window)=>{
  phase('shell window created');
  window.webContents.on('render-process-gone',(_event,details)=>finish(Error('Shell renderer exited: '+details.reason)));
