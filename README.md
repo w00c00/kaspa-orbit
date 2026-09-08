@@ -1,0 +1,73 @@
+# Kaspa Orbit
+
+跨平台 Kaspa 生态桌面钱包与内置 dApp 浏览器，开发中。
+Cross-platform Kaspa ecosystem desktop wallet and embedded dApp browser. In development.
+
+Repository / 仓库: https://github.com/w00c00/kaspa-orbit
+
+v0.1.0 是开发预览版，不是正式资产钱包。发布草稿仅仓库维护者可见。
+v0.1.0 is a developer preview, not a production wallet. Draft releases are visible only to repository maintainers.
+
+改名保留 `kaspa-nexus` 钱包数据目录、加密格式和派生路径，不迁移或覆盖钱包。
+The rename preserves the legacy `kaspa-nexus` profile, encryption format and derivation paths.
+
+目标 / Scope: Kaspa native KAS, KRC20, KCC20, Igra and Kasplex EVM, macOS / Windows / Linux.
+
+## Run / 运行
+
+Node.js 22 or newer:
+
+```sh
+npm install
+npm test
+npm run test:desktop
+npm start
+```
+
+`npm run dist` packages for the current OS. Native OS builds and signing still need verification.
+
+`test:desktop` runs the actual Electron shell with a temporary profile and an
+ephemeral, unfunded wallet. It never opens the user's existing wallet. It checks
+creation, backup dismissal, lock/unlock, feature controls and protected history.
+On headless Linux use `xvfb-run -a npm run test:desktop`. The GitHub workflow
+runs unit tests, this smoke test and packaging independently on all three OSes;
+the workflow file alone is not evidence that those jobs passed.
+
+## Current status / 当前状态
+
+- Local AES-256-GCM vault, scrypt password derivation, BIP39 creation/import and locking.
+- Kaspa and EVM account derivation; isolated Chromium dApp view and origin-scoped connection approval.
+- Initial bilingual interface.
+- Igra testnet/mainnet and Kasplex mainnet RPC identity checks and balance queries.
+- EVM message/typed-data signing and reviewed transaction signing path; EIP-6963 discovery and provider event listeners. Transaction tests currently use mock RPC.
+- EVM 同一 provider 同时提供于 `window.ethereum` 与 `window.kasware.ethereum`，兼容 KasWare 的连接入口。
+  Both EVM entry points share the same provider, network, permissions and events.
+- Kaspa `signMessage(message, {type, noAuxRand})` 返回 KIP-5 Schnorr 十六进制签名；支持 `auto` / `schnorr` 和布尔值 `noAuxRand`。ECDSA、未知参数明确拒绝，不会静默降级，也不声称兼容旧版 Base64 签名格式。
+  Message signing returns KIP-5 Schnorr hex. ECDSA and unknown options are rejected; legacy Base64 formats are not supported.
+- Kaspa 主网默认；可切换 TN10，记住网络选择。切换网络会断开网站授权并清除旧网络显示。
+  Kaspa mainnet by default, with a persistent TN10 selector. Switching disconnects sites and clears stale network views.
+- KAS 转账界面和 dApp `sendKaspa(recipient, sompi, options)`；金额按 sompi 处理，只支持空 options，不会静默忽略手续费选项。
+  Native KAS transfers from the wallet and dApps, reviewed before signing. Empty options only; unsupported fee options are rejected.
+- KRC20 持仓、两步转账及恢复记录；ERC20 查询和转账；KCC20 索引器持仓查询。
+  KRC20 holdings, commit/reveal transfers and recovery records; ERC20 lookup/transfers; indexed KCC20 holdings.
+- dApp 可调用 `kasware.signKRC20Transaction(inscriptionJson, 4, destination?, 0)` 发起转账；`amt` 必须是最小单位整数字符串，只能指定 tick 或 ca 之一。接收地址冲突、未知字段、部署/铸造和非零自定义手续费会被拒绝。该接口会在用户确认后签名并广播，失败可从钱包恢复记录继续。
+  KRC20 dApp transfers use type 4, atomic-unit string amounts and exactly one tick/ca identity. Review, persistent recovery and network checks precede broadcast. Deployment/mint and custom priority fees are not implemented; indexer balances are advisory, and live transfer outcomes remain unverified.
+- Safe-JSON PSKT 指定输入签名，保留其他 Covenant 输入；尚未覆盖所有 PSKT 格式。
+  Selective Safe-JSON PSKT signing preserves other covenant inputs; not all PSKT formats are supported.
+- Pending: native KCC20 transfer adapters, broader provider compatibility, real dApp end-to-end tests, and Windows/Linux runtime verification.
+
+51 automated tests currently pass. These include real local Schnorr verification, mock RPC and main-process request-route tests, not proof of production readiness or live token-transfer success.
+
+本地发送记录支持 EVM 回执和 Kaspa 节点接受列表查询，不将其视为最终性保证。已对 Igra 和 Kaspa 主网公开交易做过只读验证；Kasplex 实际回执验证仍待完成。Kaspa 新交易保存查询检查点，旧记录或已裁剪的历史可能无法验证。
+Local outgoing history supports EVM receipts and Kaspa node acceptance-list checks, not finality guarantees. Read-only public-transaction validation passed on Igra and Kaspa mainnet; live Kasplex receipts remain unverified. New Kaspa sends save a checkpoint; old or pruned history may be unverifiable.
+
+当前版本尚未完成交易功能和安全审查。Do not treat this development build as a production wallet.
+
+## References
+
+- https://docs.kasware.xyz/wallet/dev-base/kaspa
+- https://github.com/kaspa-wallet-standard/kaspa-wallet-standard
+- https://igra-labs.gitbook.io/igralabs-docs/quickstart/network-info
+- https://github.com/kaspanet/kccs
+
+SilverScript upstream observed on 2026-09-07: `c7d17a15ac88610d013ec9ffffa9520aeb69929b`. No native KCC20 transfer artifact is pinned or enabled yet; KCC20 holdings are currently indexer-reported rather than locally verified.

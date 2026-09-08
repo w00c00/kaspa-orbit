@@ -1,0 +1,9 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const {endpoint,overrides}=require('../desktop/rpc-config.cjs');const {EvmService}=require('../desktop/evm.cjs');const {KaspaService}=require('../desktop/kaspa.cjs');
+test('RPC configuration separates protocols and permits plaintext only on loopback',()=>{
+ assert.equal(endpoint('mainnet','wss://node.example'),'wss://node.example/');assert.equal(endpoint('testnet-10','ws://127.0.0.1:17210'),'ws://127.0.0.1:17210/');assert.equal(endpoint('igra','http://localhost:8545'),'http://localhost:8545/');assert.equal(endpoint('kasplex',''),'');
+ for(const url of ['ws://node.example','https://node.example','wss://user:pass@node.example','wss://node.example?key=x','wss://node.example/#x','file:///tmp/node'])assert.throws(()=>endpoint('mainnet',url));
+ assert.throws(()=>endpoint('igra','http://192.168.1.1:8545'));assert.throws(()=>endpoint('unknown','https://node.example'));
+ assert.deepEqual(overrides({mainnet:'wss://node.example',unknown:'bad'}),{mainnet:'wss://node.example/'});
+});
+test('EVM custom URL still verifies exact chain ID',async()=>{let url;const service=new EvmService(async(u)=>{url=u;return {ok:true,json:async()=>({result:'0x1'})};});service.rpcOverrides={igra:'https://node.example/'};await assert.rejects(service.verify(),/wrong chain/);assert.equal(url,'https://node.example/');});
+test('Kaspa custom URL reaches factory and wrong-network node is rejected',async()=>{let selected,closed=false;const service=new KaspaService((network,url)=>{selected={network,url};return {connect:async()=>{},getServerInfo:async()=>({networkId:'testnet-10',isSynced:true,hasUtxoIndex:true}),disconnect:async()=>{closed=true;}};});service.rpcOverrides={mainnet:'wss://node.example/'};await assert.rejects(service.withRpc(()=>true),/network mismatch/);assert.deepEqual(selected,{network:'mainnet',url:'wss://node.example/'});assert.ok(closed);});

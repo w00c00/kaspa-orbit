@@ -1,0 +1,25 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');
+test('injected provider discovers, reports errors and removes event listeners',async()=>{
+  const events=new Map(),announced=[],callbacks=[],requests=[];
+  const window={addEventListener:(type,fn)=>events.set(type,fn),dispatchEvent:event=>{if(event.type==='eip6963:announceProvider')announced.push(event.detail);}};
+  const context=vm.createContext({window,crypto:require('node:crypto').webcrypto,CustomEvent:class{constructor(type,{detail}){this.type=type;this.detail=detail;}},console});
+  const electron={contextBridge:{exposeInMainWorld:(key,value)=>window[key]=value,executeInMainWorld:({func})=>vm.runInContext(`(${func.toString()})()`,context)},ipcRenderer:{invoke:async(_channel,request)=>{requests.push(request);return request.method==='eth_chainId'?{result:'0x97b4'}:{error:{code:4001,message:'Rejected'}};},on:(_channel,fn)=>{callbacks.push(fn);}}};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../desktop/dapp-preload.cjs'),'utf8'),{require:name=>{assert.equal(name,'electron');return electron;}});
+  assert.equal(announced.length,1);assert.equal(announced[0].provider,window.ethereum);events.get('eip6963:requestProvider')();assert.equal(announced.length,2);
+  assert.equal(await window.ethereum.request({method:'eth_chainId'}),'0x97b4');
+  await assert.rejects(window.ethereum.request({method:'eth_requestAccounts'}),error=>error.code===4001);
+  let changes=0;const listener=()=>changes++;assert.equal(window.ethereum.on('accountsChanged',listener),window.ethereum);
+  callbacks[0](null,{family:'evm',event:'accountsChanged',value:[]});assert.equal(changes,1);
+  window.ethereum.removeListener('accountsChanged',listener);callbacks[0](null,{family:'evm',event:'accountsChanged',value:[]});assert.equal(changes,1);
+  assert.equal(typeof window.kasware.requestAccounts,'function');
+  assert.equal(window.kasware.ethereum,window.ethereum);assert.equal(window.kasware.ethereum.isKasWare,true);
+  assert.equal(await window.kasware.ethereum.request({method:'eth_chainId'}),'0x97b4');
+  assert.equal(Object.getOwnPropertyDescriptor(window.kasware,'ethereum').writable,false);
+  await assert.rejects(window.kasware.signMessage('hello',{type:'schnorr',noAuxRand:true}),error=>error.code===4001);
+  assert.equal(JSON.stringify(requests.at(-1)),JSON.stringify({family:'kaspa',method:'signMessage',params:['hello',{type:'schnorr',noAuxRand:true}]}));
+  await assert.rejects(window.kasware.signKRC20Transaction('inscription',4,'destination',0),error=>error.code===4001);
+  assert.equal(JSON.stringify(requests.at(-1)),JSON.stringify({family:'kaspa',method:'signKRC20Transaction',params:['inscription',4,'destination',0]}));
+  assert.equal(typeof window.kasware.disconnect,'function');
+  assert.equal(typeof window.kasware.switchNetwork,'function');
+  await assert.rejects(window.kasware.switchNetwork('testnet-10'),error=>error.code===4001);
+});

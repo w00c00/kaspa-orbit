@@ -1,0 +1,13 @@
+const accountPanel=document.getElementById('accounts');
+const controls=document.createElement('section');
+controls.innerHTML='<h2>Kaspa 网络 / Network</h2><select id="kaspa-network"><option value="testnet-10">Kaspa TN10</option><option value="mainnet">Kaspa Mainnet</option></select><p id="kaspa-balance">—</p><button id="kaspa-refresh" class="secondary">查询 KAS 余额 / KAS balance</button><h2>发送 / Send</h2><form id="send-form"><select id="send-family"><option value="kaspa">Kaspa L1</option><option value="evm">EVM · 当前网络 / Current network</option></select><input id="recipient" required placeholder="接收地址 / Recipient"><input id="amount" required inputmode="decimal" placeholder="金额 / Amount"><button>审核转账 / Review transfer</button></form><p id="transfer-result"></p>';
+accountPanel.append(controls);
+const networkPanel=document.createElement('section');networkPanel.className='network-panel';
+const networkHeading=controls.querySelector('h2');const networkSelect=controls.querySelector('select');
+networkPanel.append(networkHeading,networkSelect);document.querySelector('.badge').after(networkPanel);
+const networkNote=document.createElement('p');networkNote.id='network-note';networkPanel.append(networkNote);
+if(current)syncNetworkContext();
+$('kaspa-network').value=current?.kaspaNetwork||'mainnet';
+$('kaspa-network').onchange=()=>action(async()=>{const select=$('kaspa-network');select.disabled=true;try{await window.nexus.invoke('kaspa-network',{network:select.value});$('status').textContent='网络已切换，网站需重新连接 / Network switched; reconnect dApps';}finally{await refresh();select.value=current.kaspaNetwork;select.disabled=false;}});
+$('kaspa-refresh').onclick=()=>action(async()=>{$('kaspa-balance').textContent='查询中 / Loading…';try{const result=await window.nexus.invoke('kaspa-balance');$('kaspa-balance').textContent=`${result.balance} ${result.symbol}`;}catch(e){$('kaspa-balance').textContent='不可用 / Unavailable';throw e;}});
+$('send-form').onsubmit=e=>{e.preventDefault();action(async()=>{const button=$('send-form').querySelector('button');button.disabled=true;try{$('transfer-result').textContent='构建中 / Preparing…';const result=await window.nexus.invoke('send',{family:$('send-family').value,recipient:$('recipient').value.trim(),amount:$('amount').value.trim()});$('transfer-result').textContent='已广播 / Broadcast: ';const link=document.createElement('button');link.className='address';link.textContent=result.hash;link.onclick=()=>action(()=>window.nexus.invoke('browse',{url:result.url}));$('transfer-result').append(link);}catch(e){$('transfer-result').textContent='未完成 / Not completed';throw e;}finally{button.disabled=false;}});};

@@ -1,0 +1,30 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const crypto=require('node:crypto');const w=require('@kluster/kaspa-wasm');const {inspectPskt,signSelected,verifyOwnedInputs}=require('../desktop/pskt.cjs');
+test('selective signing preserves covenant input, outputs and covenant bindings',async()=>{
+ const key=new w.PrivateKey(crypto.randomBytes(32).toString('hex')),address=key.toAddress('testnet-10').toString();let generated;
+ try{generated=await w.createTransactions({entries:[0,1].map(index=>({address,outpoint:{transactionId:crypto.randomBytes(32).toString('hex'),index},amount:70000000n,scriptPublicKey:w.payToAddressScript(address),blockDaaScore:1n,isCoinbase:false})),outputs:[{address,amount:100000000n}],changeAddress:address,priorityFee:0n,networkId:'testnet-10'});
+ const data=JSON.parse(generated.transactions[0].serializeToSafeJSON());
+ data.version=1;data.inputs[0].utxo.scriptPublicKey='0000aa20'+crypto.randomBytes(32).toString('hex')+'87';data.inputs[0].utxo.covenantId=crypto.randomBytes(32).toString('hex');data.inputs[0].signatureScript='0151';data.inputs[0].computeBudget=2000;
+ const request={txJsonString:JSON.stringify(data),options:{signInputs:[{index:1,sighashType:1}]}};
+ const prepared=inspectPskt(request,address);const signed=JSON.parse(signSelected(prepared,key));assert.deepEqual(signed.inputs[0],data.inputs[0]);assert.deepEqual(signed.outputs,data.outputs);assert.match(signed.inputs[1].signatureScript,/^41[0-9a-f]{130}$/);assert.equal(signed.version,1);
+ assert.throws(()=>inspectPskt({...request,options:{signInputs:[{index:0,sighashType:1}]}},address),/not owned/);
+ assert.throws(()=>inspectPskt({...request,options:{signInputs:[{index:1,sighashType:129}]}},address),/SIGHASH_ALL/);
+ assert.throws(()=>inspectPskt({...request,options:{signInputs:[{index:1,sighashType:1},{index:1,sighashType:1}]}},address),/duplicate/);
+ assert.throws(()=>inspectPskt({...request,txJsonString:JSON.stringify({...data,futureConsensusField:'must-not-drop'})},address),/Unsupported Safe-JSON field/);
+ const legacyData={...data,mass:'0'};delete legacyData.storageMass;
+ legacyData.outputs=legacyData.outputs.map(({covenant,...output})=>covenant?{...output,covenant}:output);
+ const legacyRequest={...request,txJsonString:JSON.stringify(legacyData)};
+ const legacySigned=JSON.parse(signSelected(inspectPskt(legacyRequest,address),key));assert.equal(legacySigned.mass,'0');assert.deepEqual(legacySigned.inputs[0],data.inputs[0]);assert.deepEqual(legacySigned.outputs,legacyData.outputs);
+ for(const mass of ['1',1,0,null])assert.throws(()=>inspectPskt({...request,txJsonString:JSON.stringify({...legacyData,mass})},address),/zero mass/);
+ assert.throws(()=>inspectPskt({...request,txJsonString:JSON.stringify({...legacyData,storageMass:'1'})},address),/Duplicate mass/);
+ assert.throws(()=>inspectPskt({...request,options:{...request.options,autoFinalize:false}},address),/Unsupported signing option/);
+ await assert.rejects(verifyOwnedInputs(prepared,{withRpc:fn=>fn({getUtxosByAddresses:async()=>({entries:[]})})}),/live wallet UTXO/);
+ const walletInput=data.inputs[1],scriptObject={version:0,script:walletInput.utxo.scriptPublicKey.slice(4)};
+ const live={outpoint:{transactionId:walletInput.transactionId,index:walletInput.index},amount:BigInt(walletInput.utxo.amount),scriptPublicKey:scriptObject,isCoinbase:false,covenantId:null};
+ const service={withRpc:fn=>fn({getUtxosByAddresses:async()=>({entries:[live]})})};await verifyOwnedInputs(prepared,service);
+ live.scriptPublicKey={...scriptObject,version:1};await assert.rejects(verifyOwnedInputs(prepared,service),/live wallet UTXO/);live.scriptPublicKey=scriptObject;
+ live.covenantId=crypto.randomBytes(32).toString('hex');await assert.rejects(verifyOwnedInputs(prepared,service),/live wallet UTXO/);live.covenantId=null;
+ const lockedChange=structuredClone(data);lockedChange.outputs=lockedChange.outputs.map(o=>({...o,covenant:{authorizingInput:0,covenantId:data.inputs[0].utxo.covenantId}}));
+ const lockedReview=inspectPskt({...request,txJsonString:JSON.stringify(lockedChange)},address);assert.match(lockedReview.summary,/普通钱包找零: 0\.00000000 KAS/);
+ assert.ok(Object.isFrozen(prepared.signInputs));
+ }finally{key.free();for(const tx of generated?.transactions||[])tx.free();generated?.summary.free();}
+});
