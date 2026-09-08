@@ -22,9 +22,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - name: Desktop smoke test
+        timeout-minutes: 2
         if: runner.os != 'Linux'
         run: npm run test:desktop
       - name: Linux desktop smoke test
+        timeout-minutes: 2
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:desktop -- --no-sandbox
       - name: Package without publishing

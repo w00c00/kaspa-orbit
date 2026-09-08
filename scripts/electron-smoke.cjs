@@ -3,12 +3,18 @@ const {app,session,webContents}=require('electron');const fs=require('node:fs');
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'nexus-smoke-'));
 app.setPath('userData',profile);app.setPath('sessionData',profile);
 const password=crypto.randomBytes(24).toString('hex');
+const phase=label=>console.log('SMOKE phase: '+label);
+phase('temporary profile configured');
 let done=false;
 const timeout=setTimeout(()=>finish(Error('Desktop smoke test timed out')),30000);
 function finish(error){if(done)return;done=true;clearTimeout(timeout);console.log(error?'FAIL desktop smoke: '+error.message:'PASS desktop smoke: isolated wallet lifecycle, UI, RPC/history and sandboxed dApp provider/alias');app.exit(error?1:0);}
 process.on('exit',()=>{fs.rmSync(profile,{recursive:true,force:true});});
 app.on('browser-window-created',(_event,window)=>{
+ phase('shell window created');
+ window.webContents.on('render-process-gone',(_event,details)=>finish(Error('Shell renderer exited: '+details.reason)));
+ window.webContents.on('did-fail-load',(_event,code,description,_url,isMainFrame)=>{if(isMainFrame)finish(Error('Shell load failed: '+code+' '+description));});
  window.webContents.once('did-finish-load',async()=>{
+  phase('shell document loaded');
   try{
    const result=await window.webContents.executeJavaScript(`(async()=>{
     const assert=(condition,label)=>{if(!condition)throw Error(label);};
@@ -32,12 +38,14 @@ app.on('browser-window-created',(_event,window)=>{
     await window.nexus.invoke('lock');await refresh();return {ok:true};
    })()`);
    if(!result.ok)throw Error('Unexpected desktop test result');
+   phase('wallet lifecycle verified');
    // Controlled HTTPS fixture, served entirely in-process; no real website or node.
    session.fromPartition('persist:dapps').protocol.handle('https',request=>{
     if(new URL(request.url).hostname!=='nexus-smoke.test')return new Response('Blocked by test',{status:403});
     return new Response('<!doctype html><title>Nexus provider fixture</title><p>Isolated provider test</p>',{headers:{'content-type':'text/html'}});
    });
    await window.webContents.executeJavaScript("window.nexus.invoke('browse',{url:'https://nexus-smoke.test/'})");
+   phase('embedded fixture loaded');
    const dapp=webContents.getAllWebContents().find(wc=>wc.getURL()==='https://nexus-smoke.test/');
    if(!dapp)throw Error('Embedded dApp view missing');
    await dapp.executeJavaScript(`(async()=>{
@@ -51,6 +59,7 @@ app.on('browser-window-created',(_event,window)=>{
     let discovered;window.addEventListener('eip6963:announceProvider',e=>discovered=e.detail);window.dispatchEvent(new Event('eip6963:requestProvider'));
     assert(discovered?.provider===window.ethereum&&discovered.info.name==='Kaspa Orbit','wallet discovery failed');
    })()`);
+   phase('isolated provider verified');
    finish();
   }catch(error){finish(error);}
  });
