@@ -1,6 +1,7 @@
 // Development-only harness. Not packaged; never uses the real wallet profile.
-const {app,session,webContents}=require('electron');const fs=require('node:fs');const os=require('node:os');const path=require('node:path');const crypto=require('node:crypto');
-const profile=fs.mkdtempSync(path.join(os.tmpdir(),'nexus-smoke-'));
+const {app,session,webContents}=require('electron');const crypto=require('node:crypto');
+const profile=process.env.ORBIT_SMOKE_PROFILE;
+if(!profile)throw Error('Use npm run test:desktop to create an isolated disposable profile');
 app.setPath('userData',profile);app.setPath('sessionData',profile);
 const password=crypto.randomBytes(24).toString('hex');
 const phase=label=>console.log('SMOKE phase: '+label);
@@ -10,7 +11,7 @@ const timeout=setTimeout(()=>finish(Error('Desktop smoke test timed out')),30000
 function finish(error){if(done)return;done=true;clearTimeout(timeout);console.log(error?'FAIL desktop smoke: '+error.message:'PASS desktop smoke: isolated wallet lifecycle, UI, RPC/history and sandboxed dApp provider/alias');if(error)app.exit(1);else app.quit();}
 app.on('before-quit',()=>phase('normal quit requested'));
 app.on('will-quit',()=>phase('windows closed; app will quit'));
-process.on('exit',()=>{phase('process exit; removing temporary profile');fs.rmSync(profile,{recursive:true,force:true});phase('temporary profile removed');});
+process.on('exit',()=>phase('Electron process exit'));
 app.on('browser-window-created',(_event,window)=>{
  phase('shell window created');
  window.webContents.on('render-process-gone',(_event,details)=>finish(Error('Shell renderer exited: '+details.reason)));
