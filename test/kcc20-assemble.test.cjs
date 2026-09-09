@@ -105,13 +105,20 @@ test('token approval derives amounts from transaction and snapshots mutable call
   const f=fixture(owner.toString()),original=assembleAddressTransfer(f.plan,f.funding,f.options);
   const prepared={...f,draft:{...original,feeSompi:'1',changeSompi:'999'},revision:0};
   const raw=JSON.parse(original.transaction),entries=raw.inputs.map(i=>({outpoint:{transactionId:i.transactionId,index:i.index},covenantId:i.utxo.covenantId,amount:BigInt(i.utxo.amount),blockDaaScore:BigInt(i.utxo.blockDaaScore),isCoinbase:false,scriptPublicKey:{version:0,script:i.utxo.scriptPublicKey.slice(4)}}));
-  const service={network:'testnet-10',revision:0,withRpc:fn=>fn({getUtxosByAddresses:async()=>({entries})})};let signed=0;
+  const info={networkId:'testnet-10',isSynced:true,hasUtxoIndex:true,virtualDaaScore:467579632n};
+  const service={network:'testnet-10',revision:0,withRpc:fn=>fn({getUtxosByAddresses:async()=>({entries})},info)};let signed=0;
   const vault={locked:false,withKaspaKey:fn=>{signed++;return fn(key);}};
   const result=await authorizeAddressTransfer({service,prepared,vault,valid:()=>true,approve:async summary=>{
    const review=JSON.parse(summary);assert.equal(review.feeSompi,original.feeSompi);assert.equal(review.kasChangeSompi,original.changeSompi);
    prepared.plan.outputs[0].owner='ff'.repeat(32);prepared.options.feeSompi='1';
   }});
   assert.equal(signed,1);assert.deepEqual(JSON.parse(result.transaction).outputs,raw.outputs);
+  const fresh={...fixture(owner.toString()),draft:original,revision:0};
+  for(const patch of [{isSynced:false},{hasUtxoIndex:false},{networkId:'mainnet'},{virtualDaaScore:1n}]){
+   Object.assign(info,{networkId:'testnet-10',isSynced:true,hasUtxoIndex:true,virtualDaaScore:467579632n});
+   await assert.rejects(authorizeAddressTransfer({service,prepared:fresh,vault,valid:()=>true,approve:async()=>{Object.assign(info,patch);}}),/TN10/);
+   assert.equal(signed,1,'changed node must not access the signing key');
+  }
  }finally{owner.free();pub.free();key.free();}
 });
 test('token submission journals before sending and never auto-retries uncertainty',async()=>{

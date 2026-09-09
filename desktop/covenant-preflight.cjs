@@ -3,7 +3,7 @@ const {restoreBoundTransaction}=require('./covenant-transaction.cjs');
 const {covenantIdentity}=require('./utxo-identity.cjs');
 // Recheck the exact reviewed bytes, not mutable plan objects. This is a node
 // observation, not a reservation or a consensus/script-engine validation.
-async function recheckCovenantInputs(service,network,transaction){
+async function recheckCovenantInputs(service,network,transaction,validateNode){
  const revision=service.revision;
  const current=()=>{if(service.network!==network||service.revision!==revision)throw Error('Network changed during input preflight');};
  current();
@@ -21,7 +21,8 @@ async function recheckCovenantInputs(service,network,transaction){
   try{address=w.addressFromScriptPublicKey(script,network);if(!address)throw Error('Unsupported input address');addresses.add(address.toString());}
   finally{address?.free();script.free();}
  }
- await service.withRpc(async rpc=>{
+ await service.withRpc(async (rpc,info)=>{
+  if(validateNode){validateNode(info||await rpc.getServerInfo());current();}
   const {entries}=await rpc.getUtxosByAddresses({addresses:[...addresses]});current();
   for(const input of raw.inputs){
    const matches=entries.filter(e=>String(e.outpoint.transactionId).toLowerCase()===input.transactionId&&e.outpoint.index===input.index);

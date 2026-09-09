@@ -1,8 +1,8 @@
 const {assembleAddressTransfer}=require('./kcc20-assemble.cjs');
 const {recheckCovenantInputs}=require('./covenant-preflight.cjs');
 const {signAddressTransfer}=require('./kcc20-sign.cjs');
-// Backend orchestration only: approve must reject on cancellation. No IPC
-// exposure or broadcast until durable recovery and submission are implemented.
+const {requireTn10Toccata}=require('./kcc20-network.cjs');
+// Backend orchestration only: approve must reject on cancellation.
 async function authorizeAddressTransfer({service,prepared,vault,valid,approve}){
  const snapshot=structuredClone(prepared),{plan,funding,options,draft,revision}=snapshot;
  const check=()=>{if(!valid()||vault.locked||service.network!==plan.network||service.revision!==revision)throw Error('Wallet or network changed before token signing');};
@@ -14,7 +14,7 @@ async function authorizeAddressTransfer({service,prepared,vault,valid,approve}){
   tokenOutputs:plan.outputs.map(output=>({owner:output.owner,atomicAmount:output.amount})),
   carrierSompi:tx.outputs.slice(0,-1).map(output=>output.value),feeSompi:canonical.feeSompi,kasChangeSompi:canonical.changeSompi});
  await approve(summary,()=>{try{check();return true;}catch{return false;}});check();
- await recheckCovenantInputs(service,plan.network,draft.transaction);check();
+ await recheckCovenantInputs(service,plan.network,draft.transaction,requireTn10Toccata);check();
  return vault.withKaspaKey(key=>signAddressTransfer(plan,funding,options,draft.transaction,key));
 }
 module.exports={authorizeAddressTransfer};
