@@ -1,5 +1,5 @@
 // Development-only harness. Not packaged; never uses the real wallet profile.
-const {app,session,webContents}=require('electron');const crypto=require('node:crypto');
+const {app,session,webContents,dialog}=require('electron');const crypto=require('node:crypto');
 const profile=process.env.ORBIT_SMOKE_PROFILE;
 if(!profile)throw Error('Use npm run test:desktop to create an isolated disposable profile');
 app.setPath('userData',profile);app.setPath('sessionData',profile);
@@ -83,6 +83,32 @@ app.on('browser-window-created',(_event,window)=>{
     assert(discovered?.provider===window.ethereum&&discovered.info.name==='Kaspa Orbit','wallet discovery failed');
    })()`);
    phase('isolated provider verified');
+   await window.webContents.executeJavaScript(`window.nexus.invoke('unlock',{password:${JSON.stringify(password)}})`);
+   const originalDialog=dialog.showMessageBox;let accountApprovals=0;
+   dialog.showMessageBox=async(_window,options)=>{
+    if(options.message==='https://nexus-smoke.test'&&options.detail==='Allow this site to see your evm address? / 允许网站查看钱包地址？'){
+     accountApprovals++;return {response:1};
+    }
+    return {response:0};
+   };
+   try{
+    await dapp.executeJavaScript(`(async()=>{
+     const assert=(ok,label)=>{if(!ok)throw Error(label);};
+     assert((await ethereum.request({method:'eth_accounts'})).length===0,'account exposed before connection');
+     const permissions=await ethereum.request({method:'wallet_requestPermissions',params:[{eth_accounts:{}}]});
+     assert(permissions[0]?.parentCapability==='eth_accounts','account permission missing');
+     const accounts=await ethereum.request({method:'eth_accounts'});assert(accounts.length===1&&/^0x[0-9a-fA-F]{40}$/.test(accounts[0]),'connected account missing');
+     assert((await ethereum.request({method:'wallet_getPermissions'})).length===1,'permission query mismatch');
+     let cleared=false;const listener=accounts=>{if(accounts.length===0)cleared=true;};ethereum.on('accountsChanged',listener);
+     await ethereum.request({method:'wallet_revokePermissions',params:[{eth_accounts:{}}]});
+     for(let i=0;i<20&&!cleared;i++)await new Promise(r=>setTimeout(r,25));
+     ethereum.removeListener('accountsChanged',listener);assert(cleared,'disconnect event missing');
+     assert((await ethereum.request({method:'eth_accounts'})).length===0,'account remained connected');
+     assert((await ethereum.request({method:'wallet_getPermissions'})).length===0,'permission remained granted');
+    })()`);
+    if(accountApprovals!==1)throw Error('Unexpected number of connection approvals');
+   }finally{dialog.showMessageBox=originalDialog;await window.webContents.executeJavaScript("window.nexus.invoke('lock')");}
+   phase('EVM connect/query/revoke lifecycle verified');
    finish();
   }catch(error){finish(error);}
  });
