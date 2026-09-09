@@ -34,10 +34,10 @@ test('automatic KCC20 funding excludes covenant and coinbase outputs and recheck
  const token=entry(f.plan.inputs[0]),funding=entry(f.funding);let calls=0;
  const service={network:'testnet-10',revision:0,withRpc:fn=>fn({getUtxosByAddresses:async()=>{
   calls++;return {entries:calls===1?[{...funding,covenantId:f.plan.covenantId},{...funding,isCoinbase:true},funding]:[token,funding]};
- }})};
+ }},{networkId:'testnet-10',isSynced:true,hasUtxoIndex:true,virtualDaaScore:467579632n})};
  const prepared=await prepareAddressTransfer(service,f.plan,f.options);
  assert.equal(calls,2);assert.equal(prepared.funding.covenantId,null);assert.equal(prepared.requiresApproval,true);
- calls=0;service.withRpc=fn=>fn({getUtxosByAddresses:async()=>({entries:[{...funding,covenantId:f.plan.covenantId}]})});
+ calls=0;service.withRpc=fn=>fn({getUtxosByAddresses:async()=>({entries:[{...funding,covenantId:f.plan.covenantId}]})},{networkId:'testnet-10',isSynced:true,hasUtxoIndex:true,virtualDaaScore:467579632n});
  await assert.rejects(prepareAddressTransfer(service,f.plan,f.options),/No suitable/);
 });
 test('input preflight accepts real WASM UTXO references without losing covenant identity',async()=>{
@@ -121,10 +121,12 @@ test('token submission journals before sending and never auto-retries uncertaint
   const f=fixture(owner.toString()),draft=assembleAddressTransfer(f.plan,f.funding,f.options),signed=signAddressTransfer(f.plan,f.funding,f.options,draft.transaction,key);
   const raw=JSON.parse(signed.transaction),entries=raw.inputs.map(i=>({outpoint:{transactionId:i.transactionId,index:i.index},covenantId:i.utxo.covenantId,amount:BigInt(i.utxo.amount),blockDaaScore:BigInt(i.utxo.blockDaaScore),isCoinbase:false,scriptPublicKey:{version:0,script:i.utxo.scriptPublicKey.slice(4)}}));
   const events=[];let failStorage=false,failRpc=false;
-  const service={network:'testnet-10',revision:0,history:{before:()=>{events.push('before');if(failStorage)throw Error('Disk full');},after:()=>events.push('after')},withRpc:fn=>fn({getUtxosByAddresses:async()=>({entries}),getSink:async()=>({sink:'ee'.repeat(32)}),submitTransaction:async()=>{events.push('submit');if(failRpc)throw Error('Timeout');return {transactionId:signed.transactionId};}})};
+  const info={networkId:'testnet-10',isSynced:true,hasUtxoIndex:true,virtualDaaScore:467579632n};
+  const service={network:'testnet-10',revision:0,history:{before:()=>{events.push('before');if(failStorage)throw Error('Disk full');},after:()=>events.push('after')},withRpc:fn=>fn({getUtxosByAddresses:async()=>({entries}),getSink:async()=>({sink:'ee'.repeat(32)}),submitTransaction:async()=>{events.push('submit');if(failRpc)throw Error('Timeout');return {transactionId:signed.transactionId};}},info)};
   const ownerAddress=key.toAddress('testnet-10'),address=ownerAddress.toString();ownerAddress.free();
   await assert.rejects(submitAddressTransfer({service,signed,address:'wrong-account',valid:()=>true}),/account mismatch/);assert.deepEqual(events,[]);
   await submitAddressTransfer({service,signed,address,valid:()=>true});assert.deepEqual(events,['before','submit','after']);
+  events.length=0;info.virtualDaaScore=1n;await assert.rejects(submitAddressTransfer({service,signed,address,valid:()=>true}),/activation/);assert.deepEqual(events,[]);info.virtualDaaScore=467579632n;
   events.length=0;failStorage=true;await assert.rejects(submitAddressTransfer({service,signed,address,valid:()=>true}),/Disk full/);assert.deepEqual(events,['before']);
   events.length=0;failStorage=false;failRpc=true;await assert.rejects(submitAddressTransfer({service,signed,address,valid:()=>true}),/status unknown/);assert.deepEqual(events,['before','submit']);
  }finally{owner.free();pub.free();key.free();}

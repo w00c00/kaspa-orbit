@@ -19,7 +19,7 @@ function signAddressTransfer(plan,funding,options,reviewedTransaction,key){
   try{inputs[draft.ownerInputIndex].signatureScript=signature;tx.inputs=inputs;}
   finally{inputs.forEach(input=>input.free());}
   tx.finalize().free();
-  if(!w.updateTransactionMass(plan.network,tx,1))throw Error('Signed token transaction exceeds mass limit');
+  if(!w.updateTransactionMass(plan.network,tx,1,options.isToccataActive===true))throw Error('Signed token transaction exceeds mass limit');
   const mass=w.calculateTransactionMass(plan.network,tx,1);
   if(mass>BigInt(options.feeSompi))throw Error('Signed token transaction fee too low');
   const transaction=tx.serializeToSafeJSON(),after=JSON.parse(transaction),before=JSON.parse(reviewedTransaction);

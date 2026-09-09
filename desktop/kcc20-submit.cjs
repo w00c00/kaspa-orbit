@@ -1,5 +1,6 @@
 const {restoreBoundTransaction}=require('./covenant-transaction.cjs');
 const {recheckCovenantInputs}=require('./covenant-preflight.cjs');
+const {requireTn10Toccata}=require('./kcc20-network.cjs');
 const w=require('@kluster/kaspa-wasm');
 async function bounded(promise,ms){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Node request timed out')),ms);})]);}finally{clearTimeout(timer);}}
 // Internal TN10 submission boundary. The caller must supply the signed result
@@ -14,7 +15,8 @@ async function submitAddressTransfer({service,signed,address,valid}){
  try{ownerAddress=w.addressFromScriptPublicKey(ownerScript,network);if(ownerAddress?.toString()!==address)throw Error('Token history account mismatch');}
  finally{ownerAddress?.free();ownerScript.free();}
  await recheckCovenantInputs(service,network,transaction);check();
- return service.withRpc(async rpc=>{
+ return service.withRpc(async (rpc,info)=>{
+  requireTn10Toccata(info||await rpc.getServerInfo());check();
   const {sink:anchor}=await bounded(rpc.getSink(),5000);check();
   const tx=restoreBoundTransaction(transaction);
   try{

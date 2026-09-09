@@ -3,7 +3,7 @@ const {inspectProgram,encodeAddressUnlock}=require('./kcc20-codec.cjs');
 const {restoreBoundTransaction}=require('./covenant-transaction.cjs');
 const uint=s=>typeof s==='string'&&/^(0|[1-9]\d*)$/.test(s)&&s.length<=20;
 // Local assembly only; live input rechecks and wallet approval remain required.
-function assembleAddressTransfer(plan,funding,{owner,feeSompi,carrierSompi='50000000'}){
+function assembleAddressTransfer(plan,funding,{owner,feeSompi,carrierSompi='50000000',isToccataActive=false}){
  if(!/^[a-f0-9]{64}$/.test(owner)||!['mainnet','testnet-10'].includes(plan.network)||!Array.isArray(plan.inputs)||plan.inputs.length<1||plan.inputs.length>4||!Array.isArray(plan.outputs)||plan.outputs.length<1||plan.outputs.length>5)throw Error('Invalid token assembly layout');
  if(!uint(feeSompi)||!uint(carrierSompi)||BigInt(carrierSompi)<50000000n||BigInt(carrierSompi)>2100000000000000000n)throw Error('Invalid fee or token carrier');
  const ownerScript='000020'+owner+'ac',seen=new Set();let kasIn=0n,tokenIn=0n,tokenOut=0n;
@@ -35,7 +35,7 @@ function assembleAddressTransfer(plan,funding,{owner,feeSompi,carrierSompi='5000
  // Size the exact Schnorr signature push without exposing a signing key.
  raw.inputs[ownerInputIndex].signatureScript='41'+'00'.repeat(65);
  const sized=restoreBoundTransaction(JSON.stringify(raw));let estimatedMass;
- try{if(!w.updateTransactionMass(plan.network,sized,1))throw Error('Token transaction exceeds mass limit');estimatedMass=w.calculateTransactionMass(plan.network,sized,1);raw.storageMass=String(sized.storageMass);}finally{sized.free();}
+ try{if(!w.updateTransactionMass(plan.network,sized,1,isToccataActive===true))throw Error('Token transaction exceeds mass limit');estimatedMass=w.calculateTransactionMass(plan.network,sized,1);raw.storageMass=String(sized.storageMass);}finally{sized.free();}
  if(BigInt(feeSompi)<estimatedMass)throw Error('Fee below estimated transaction mass');
  raw.inputs[ownerInputIndex].signatureScript='';const unsigned=restoreBoundTransaction(JSON.stringify(raw));
  try{return Object.freeze({network:plan.network,transaction:unsigned.serializeToSafeJSON(),ownerInputIndex,feeSompi,changeSompi:String(change),estimatedMass:String(estimatedMass),requiresFinalLiveRecheck:true,readyToSign:false});}finally{unsigned.free();}
