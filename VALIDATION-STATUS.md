@@ -39,3 +39,8 @@ never creates a wallet, and removes its temporary profile after Electron exits.
 The same public-page probe also passed for `https://app.zealousswap.com/`:
 document ready state `complete`, Orbit discovery present, no accounts exposed.
 No connect button was approved, and no trade was prepared or submitted.
+
+With `--wallet-picker`, the Zealous Swap probe waits for SPA hydration and opens
+the observed Connect button. The site's actual picker listed **Kaspa Orbit**
+under installed wallets. No wallet option was selected, no connection approval
+was granted and the profile remained empty. This establishes UI discovery only.

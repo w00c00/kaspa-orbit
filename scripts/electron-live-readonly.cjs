@@ -22,9 +22,23 @@ app.on('browser-window-created',(_event,window)=>{
     let discovered=false;const listener=e=>{if(e.detail?.info?.rdns==='org.kaspa.nexus'&&e.detail.provider===window.ethereum)discovered=true;};
     window.addEventListener('eip6963:announceProvider',listener);window.dispatchEvent(new Event('eip6963:requestProvider'));window.removeEventListener('eip6963:announceProvider',listener);
     if(!discovered)throw Error('Discovery missing');
-    return {url:location.href,title:document.title,ready:document.readyState,emptyAccounts:true,discovered};
+    // Document load can precede SPA hydration. Observe the UI separately.
+    for(let i=0;i<100&&!document.querySelector('button');i++)await new Promise(r=>setTimeout(r,100));
+    return {url:location.href,title:document.title,ready:document.readyState,emptyAccounts:true,discovered,
+      visibleButtons:[...document.querySelectorAll('button')].filter(b=>b.checkVisibility()).slice(0,30).map(b=>b.innerText.trim()).filter(Boolean)};
    })()`);
-   console.log('PASS public page/provider smoke (not connection or transaction validation): '+JSON.stringify(result));finish();
+   console.log('PASS public page/provider smoke (not connection or transaction validation): '+JSON.stringify(result));
+   if(process.argv.includes('--wallet-picker')){
+    if(new URL(page.getURL()).hostname!=='app.zealousswap.com')throw Error('Wallet picker probe is scoped to Zealous Swap');
+    const picker=await page.executeJavaScript(`(async()=>{
+     const button=[...document.querySelectorAll('button')].find(b=>b.checkVisibility()&&['连接','Connect','Connect Wallet'].includes(b.innerText.trim()));
+     if(!button)throw Error('Observed connect control missing');button.click();
+     await new Promise(r=>setTimeout(r,1000));
+     return {text:document.body.innerText.slice(0,6000)};
+    })()`);
+    console.log('Wallet picker observation only: '+JSON.stringify(picker));
+   }
+   finish();
   }catch(error){finish(error);}
  });
 });
