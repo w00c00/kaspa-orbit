@@ -1,6 +1,6 @@
 (function(root){
  class Poller {
-  constructor({enabled,context,run,onError=()=>{},interval=30000,schedule=setTimeout,cancel=clearTimeout}){Object.assign(this,{enabled,context,run,onError,interval,schedule,cancel});this.busy=false;this.stopped=false;this.timer=null;}
+  constructor({enabled,context,run,onError=()=>{},interval=30000,schedule=(fn,ms)=>setTimeout(fn,ms),cancel=id=>clearTimeout(id)}){Object.assign(this,{enabled,context,run,onError,interval,schedule,cancel});this.busy=false;this.stopped=false;this.timer=null;}
   async tick(){
    if(this.stopped||this.busy)return;
    this.busy=true;const context=this.context();const valid=()=>!this.stopped&&this.enabled()&&this.context()===context;

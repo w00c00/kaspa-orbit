@@ -14,6 +14,7 @@ app.on('will-quit',()=>phase('windows closed; app will quit'));
 process.on('exit',()=>phase('Electron process exit'));
 app.on('browser-window-created',(_event,window)=>{
  phase('shell window created');
+ window.webContents.on('console-message',event=>{if(event.level==='error')console.error('Renderer error: '+event.message+' '+event.sourceId+':'+event.lineNumber);});
  window.webContents.on('render-process-gone',(_event,details)=>finish(Error('Shell renderer exited: '+details.reason)));
  window.webContents.on('did-fail-load',(_event,code,description,_url,isMainFrame)=>{if(isMainFrame)finish(Error('Shell load failed: '+code+' '+description));});
  window.webContents.once('did-finish-load',async()=>{
@@ -26,11 +27,17 @@ app.on('browser-window-created',(_event,window)=>{
     await refresh();assert(current.locked&&!current.exists,'isolated fresh profile');assert(current.kaspaNetwork==='mainnet','mainnet default');
     assert(document.getElementById('kaspa-network').checkVisibility(),'network selector while locked');
     const password=${JSON.stringify(password)};
+    document.getElementById('wallet-name').value='First test wallet';
+    document.getElementById('password-confirm').value=password;
     document.getElementById('password').value=password;
     document.getElementById('wallet-form').requestSubmit();
-    await wait(()=>current&&!current.locked&&document.getElementById('phrase').textContent.split(' ').length===24);
+    await wait(()=>current&&current.exists&&document.getElementById('phrase').textContent.split(' ').length===24);
+    assert(current.locked,'new wallet remains locked for backup');
+    document.getElementById('backed-up').click();
+    document.getElementById('password').value=password;document.getElementById('wallet-form').requestSubmit();await wait(()=>!current.locked);
     assert(document.getElementById('accounts').checkVisibility(),'accounts visible after creation');
     assert(current.accounts.kaspa.address.startsWith('kaspa:'),'mainnet address');
+    const firstId=current.walletId,firstAddress=current.accounts.kaspa.address;
     document.getElementById('backed-up').click();assert(!document.getElementById('phrase').textContent,'backup phrase cleared');
     for(const id of ['send-form','krc20-load','erc20-form','kcc20-load','history-load'])assert(!!document.getElementById(id),id+' missing');
     assert((await window.nexus.invoke('history')).length===0,'fresh history');assert(Object.keys(await window.nexus.invoke('rpc-settings')).length===0,'default RPC settings');
@@ -38,6 +45,13 @@ app.on('browser-window-created',(_event,window)=>{
     let rejected=false;try{await window.nexus.invoke('history');}catch{rejected=true;}assert(rejected,'locked history must reject');
     document.getElementById('password').value=password;document.getElementById('wallet-form').requestSubmit();await wait(()=>!current.locked);
     assert(!document.getElementById('phrase').textContent,'unlock must not reveal seed');
+    document.getElementById('wallet-add').click();await wait(()=>!document.getElementById('wallet-name').hidden);
+    document.getElementById('wallet-name').value='Second test wallet';document.getElementById('password').value=password;document.getElementById('password-confirm').value=password;document.getElementById('wallet-form').requestSubmit();
+    await wait(()=>current.wallets.length===2&&current.walletId!==firstId);
+    assert(current.locked,'added wallet starts locked');document.getElementById('backed-up').click();
+    const select=document.getElementById('wallet-select');select.value=firstId;select.dispatchEvent(new Event('change'));await wait(()=>current.walletId===firstId);
+    document.getElementById('password').value=password;document.getElementById('wallet-form').requestSubmit();await wait(()=>!current.locked);
+    assert(current.accounts.kaspa.address===firstAddress,'switch restores original address');
     await window.nexus.invoke('lock');await refresh();return {ok:true};
    })()`);
    if(!result.ok)throw Error('Unexpected desktop test result');

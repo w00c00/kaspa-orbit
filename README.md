@@ -73,6 +73,23 @@ Local outgoing history supports EVM receipts and Kaspa node acceptance-list chec
 
 ## References
 
+### Wallet management / 多钱包管理
+
+Use **Add wallet** to create an independent recovery phrase or import an existing
+one even when another wallet exists. Each wallet has its own encrypted file and
+password. Name and switch wallets from the selector; switching locks the old
+wallet and disconnects dApp permissions. New wallets remain locked for backup.
+Recovery phrases can be shown again only after password verification.
+
+已有钱包时仍可通过“新建或导入”添加独立钱包，每个钱包使用独立的加密文件和
+密码。支持命名、重命名和切换；切换会锁定旧钱包并断开网站授权。原有
+`vault.json` 保持原位，地址、派生路径和加密格式不变。新钱包先备份后解锁；
+需要再次备份时，可验证密码重新显示助记词。本版本尚不支持同一助记词下添加
+多个派生账户，也不提供删除钱包功能。
+
+This is independent multi-wallet support, not multiple derived accounts per
+recovery phrase. Wallet deletion is not offered in this preview.
+
 - https://docs.kasware.xyz/wallet/dev-base/kaspa
 - https://github.com/kaspa-wallet-standard/kaspa-wallet-standard
 - https://igra-labs.gitbook.io/igralabs-docs/quickstart/network-info

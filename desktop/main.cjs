@@ -15,6 +15,7 @@ const kcc20Source=new Kcc20Source();
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
 const {Vault}=require('./vault.cjs');
+const {Wallets}=require('./wallets.cjs');
 const {Permissions,originOf}=require('./policy.cjs');
 const {EvmService,NETWORKS,READ_METHODS,hex,personalMessage}=require('./evm.cjs');
 const {formatEther,parseEther,getAddress,TypedDataEncoder}=require('ethers');
@@ -42,7 +43,7 @@ async function approve(origin,detail,valid){
   try{const {response}=await dialog.showMessageBox(window,{type:'question',title:'Kaspa Orbit · Authorization / 授权',message:origin,detail,buttons:['Cancel / 取消','Approve / 确认'],defaultId:0,cancelId:0});if(response!==1)throw Object.assign(Error('User rejected request'),{code:4001});if(!valid())throw Error('Wallet, page or network changed; retry / 状态已改变，请重试');}
   finally{approvalBusy=false;}
 }
-let window, tabs, vault, operations, lastActivity=Date.now();
+let window, tabs, vault, wallets, walletBusy=false, operations, lastActivity=Date.now();
 function lockWallet(){vault.lock();disconnect();window.webContents.send('wallet-state');}
 const permissions=new Permissions();
 const shellFile=path.join(__dirname,'../ui/index.html');
@@ -54,7 +55,7 @@ app.whenReady().then(async()=>{
   settings=new Settings(path.join(app.getPath('userData'),'settings.json'));
   kaspaService.network=settings.value.kaspaNetwork;evm.network=NETWORKS.find(n=>n.id===settings.value.evmNetwork);
   kaspaService.rpcOverrides=evm.rpcOverrides=Object.freeze({...settings.value.rpcOverrides});
-  vault=new Vault(path.join(app.getPath('userData'),'vault.json'));
+  wallets=await new Wallets(app.getPath('userData')).init();vault=wallets.vault;
   operations=new Krc20Operations(path.join(app.getPath('userData'),'krc20-operations'),kaspaService);
   session.fromPartition('persist:dapps').setPermissionRequestHandler((_wc,_p,callback)=>callback(false));
   session.fromPartition('persist:dapps').setPermissionCheckHandler(()=>false);
@@ -73,13 +74,32 @@ app.whenReady().then(async()=>{
 async function walletUi(event,method,args={}){
   if(!trusted(event))throw Error('Unauthorized');
   switch(method){
-    case 'status': return {exists:await vault.exists(),locked:vault.locked,accounts:vault.accounts(kaspaService.network),kaspaNetwork:kaspaService.network,networks:NETWORKS,network:evm.network};
+    case 'status': return {walletId:wallets?.id,wallets:wallets?await wallets.list():[],exists:await vault.exists(),locked:vault.locked,accounts:vault.accounts(kaspaService.network),kaspaNetwork:kaspaService.network,networks:NETWORKS,network:evm.network};
+    case 'wallet-add':case 'wallet-select':case 'wallet-rename':{
+      if(walletBusy||networkBusy||transactionBusy||approvalBusy)throw Error('Finish pending requests first / 请先完成待处理请求');
+      walletBusy=true;disconnect();vault.lock();
+      try{
+        let phrase=null;
+        if(method==='wallet-add')phrase=await wallets.add(args.name,args.password,args.phrase);
+        else if(method==='wallet-select')await wallets.select(args.id);
+        else await wallets.rename(args.name);
+        vault=wallets.vault;lastActivity=Date.now();return {phrase};
+      }finally{vault=wallets.vault;walletBusy=false;changed();window.webContents.send('wallet-state');}
+    }
     case 'history':{
       if(vault.locked)throw Error('Unlock wallet first / 请先解锁钱包');
       const records=[...kaspaService.history.list(kaspaService.network,vault.kaspaIdentity(kaspaService.network).address),...evm.history.list(evm.network.id,vault.evm().address)];
       return records.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(r=>({...r,url:r.family==='evm'?NETWORKS.find(n=>n.id===r.network).explorer+'/tx/'+r.hash:(r.network==='mainnet'?'https://explorer.kaspa.org/txs/':'https://explorer-tn10.kaspa.org/txs/')+r.hash}));
     }
-    case 'create': return {phrase:await vault.create(args.password,args.phrase)};
+    case 'create': {
+      if(walletBusy||networkBusy||transactionBusy||approvalBusy)throw Error('Finish pending requests first');
+      walletBusy=true;try{return {phrase:await vault.create(args.password,args.phrase)};}finally{walletBusy=false;}
+    }
+    case 'wallet-recovery':{
+      if(walletBusy||networkBusy||transactionBusy||approvalBusy)throw Error('Finish pending requests first');
+      walletBusy=true;const revision=generation;
+      try{const phrase=await vault.recovery(args.password);if(revision!==generation)throw Error('Wallet changed / 钱包状态已改变');return {phrase};}finally{walletBusy=false;}
+    }
     case 'rpc-settings':return {...settings.value.rpcOverrides};
     case 'rpc-save':{
       if(networkBusy||transactionBusy||approvalBusy)throw Error('Finish pending requests first / 请先完成待处理请求');
@@ -105,7 +125,10 @@ async function walletUi(event,method,args={}){
       if(vault.locked||revision!==generation)throw Error('Wallet or network changed');
       evm.history.observation(record,observation);return observation;
     }
-    case 'unlock': await vault.unlock(args.password);lastActivity=Date.now();return true;
+    case 'unlock': {
+      if(walletBusy)throw Error('Wallet operation pending / 钱包操作进行中');
+      walletBusy=true;try{await vault.unlock(args.password);lastActivity=Date.now();return true;}finally{walletBusy=false;}
+    }
     case 'lock': lockWallet();return true;
     case 'browse': await browse(args.url);return true;
     case 'tab-new':await browse(args.url||'https://kascov.io',true);return true;
