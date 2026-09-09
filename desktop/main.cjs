@@ -236,7 +236,8 @@ ipcMain.handle('dapp-request',async(event,{family,method,params})=>{
       if(params!==undefined&&(!Array.isArray(params)||params.length))throw Object.assign(Error('wallet_getPermissions takes no parameters'),{code:-32602});
       return {result:!vault.locked&&permissions.has(origin,'evm')?[{invoker:origin,parentCapability:'eth_accounts',caveats:[]}]:[]};
     }
-    if(family==='evm'&&method==='wallet_revokePermissions'){
+    const requestAccountPermission=family==='evm'&&method==='wallet_requestPermissions';
+    if(family==='evm'&&(method==='wallet_revokePermissions'||requestAccountPermission)){
       const permission=params?.[0],scope=permission?.eth_accounts;
       if(!Array.isArray(params)||params.length!==1||!permission||Array.isArray(permission)||Object.keys(permission).length!==1||!Object.hasOwn(permission,'eth_accounts')||!scope||typeof scope!=='object'||Array.isArray(scope)||Object.keys(scope).length)throw Object.assign(Error('Expected [{eth_accounts:{}}]'),{code:-32602});
     }
@@ -252,12 +253,13 @@ ipcMain.handle('dapp-request',async(event,{family,method,params})=>{
     const accountMethods=family==='evm'?['eth_accounts','eth_requestAccounts']:['getAccounts','requestAccounts'];
     if(method===accountMethods[0]&&(!permissions.has(origin,family)||vault.locked))return {result:[]};
     if(vault.locked)throw Error('Unlock wallet in the sidebar / 请在侧栏解锁钱包');
-    if(method===accountMethods[1]&&!permissions.has(origin,family)){
+    if((method===accountMethods[1]||requestAccountPermission)&&!permissions.has(origin,family)){
       await approve(origin,`Allow this site to see your ${family} address? / 允许网站查看钱包地址？`,valid);
       permissions.grant(origin,family);
       emit(family,'accountsChanged',[family==='evm'?vault.evm().address:vault.kaspaIdentity(kaspaService.network).address]);
     }
     if(!permissions.has(origin,family))return {error:{code:4100,message:'Connect wallet first'}};
+    if(requestAccountPermission)return {result:[{invoker:origin,parentCapability:'eth_accounts',caveats:[]}]};
     const accounts=vault.accounts(kaspaService.network);
     if(accountMethods.includes(method))return {result:[family==='kaspa'?accounts.kaspa.address:accounts.evm]};
     if(family==='kaspa'&&method==='getPublicKey')return {result:accounts.kaspa.publicKey};

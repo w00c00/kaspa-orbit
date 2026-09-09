@@ -27,6 +27,17 @@ test('EVM revocation is scoped to requesting origin and works while locked',asyn
  assert.equal(vm.runInContext("permissions.has('https://example.test','kaspa')",h.context),true);
  assert.equal(h.counts().approved,0);assert.equal(h.events.at(-1)[1].event,'accountsChanged');assert.equal(h.events.at(-1)[1].value.length,0);
 });
+test('EVM account permission requests require approval and reject expanded authority',async()=>{
+ const h=harness();h.fakeVault.evm=()=>({address:'0x0000000000000000000000000000000000000001'});
+ for(const params of [[{eth_sendTransaction:{}}],[{eth_accounts:{requiredMethods:['eth_sendTransaction']}}],[{eth_accounts:{},eth_sign:{}}]])assert.equal((await h.callEvm('wallet_requestPermissions',params)).error.code,-32602);
+ assert.equal(h.counts().approved,0);
+ assert.equal((await h.callEvm('wallet_requestPermissions',[{eth_accounts:{}}])).error.code,4001);
+ assert.equal((await h.callEvm('wallet_getPermissions')).result.length,0);
+ h.allow();const result=await h.callEvm('wallet_requestPermissions',[{eth_accounts:{}}]);assert.equal(result.result[0].parentCapability,'eth_accounts');
+ assert.equal((await h.callEvm('wallet_getPermissions')).result.length,1);
+ assert.equal(vm.runInContext("permissions.has('https://example.test','kaspa')",h.context),false);
+ assert.equal(h.counts().broadcast,0);
+});
 test('real IPC route rejects iframe, locked, unauthorized and cancelled dApp sends',async()=>{
  const h=harness();assert.equal((await h.call('sendKaspa',[h.address,1],{url:h.frame.url})).error.message,'Unauthorized frame');
  h.fakeVault.locked=true;assert.match((await h.call('sendKaspa',[h.address,1])).error.message,/Unlock/);h.fakeVault.locked=false;
