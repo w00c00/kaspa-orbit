@@ -14,9 +14,9 @@ Kaspa Orbit · Release state: **Draft + Pre-release**.
 - 多标签浏览、网站断开授权、自定义节点、发送记录及节点状态查询。
 - 普通转账选币排除契约绑定资金。
 
-**重要限制：**这不是可托付真实资产的正式钱包。51 项自动化测试及 Mac
-Electron 冒烟测试已通过，但真实代币转账、第三方 dApp 全流程、Windows/Linux
-实机验证及独立安全审查尚未完成。不保证兼容所有 dApp。签名与广播需要用户确认。
+**重要限制：**这不是可托付真实资产的正式钱包。Mac、Windows、Linux 的 CI 均已
+通过 51 项测试、Electron 冒烟测试及打包，但真实代币转账、第三方 dApp 全流程、
+安装包在用户机器上的验证及独立安全审查尚未完成。不保证兼容所有 dApp。签名与广播需要用户确认。
 
 改名前后的钱包继续使用 `kaspa-nexus` 数据目录；加密格式和派生路径不变。
 Mac 构建未做 Developer ID 签名或公证。跨平台打包成功不等于对应平台运行验证。
@@ -37,9 +37,10 @@ Kaspa ecosystem.
   PSKT signing; multi-tab browsing, custom RPC and outgoing transaction history.
 - Ordinary transfer funding excludes covenant-bound UTXOs.
 
-**Not a production wallet.** Fifty-one automated tests and the Mac Electron smoke
-test pass, but live token transfers, third-party dApp end-to-end flows,
-Windows/Linux runtime validation and independent security review are incomplete.
+**Not a production wallet.** All three OS runners passed 51 automated tests,
+the Electron smoke test and native packaging. Live token transfers, third-party
+dApp end-to-end flows, installed-package tests on end-user machines and
+independent security review are incomplete.
 Not every dApp/API is supported. User approval is required for signing/broadcast.
 
 The legacy `kaspa-nexus` data directory, encryption format and derivation paths
@@ -50,6 +51,11 @@ use kascov. Node binding verification is distinct from indexer claims and contra
 safety. Prefer TN10 with valueless test funds; do not import a savings wallet.
 
 ## Downloads / 下载
+
+Validation evidence / 验证记录: [CI run 34250818751](https://github.com/w00c00/kaspa-orbit/actions/runs/34250818751).
+This run tests source commit `d11f784`; the draft binaries contain the same
+`desktop/` and `ui/` sources. Subsequent changes fixed only the test harness and CI.
+此 CI 验证源码版本与草稿安装包的 `desktop/` 和 `ui/` 内容相同；期间仅调整测试工具及 CI。
 
 Choose the asset matching your OS and CPU architecture. Windows ZIP builds are
 portable; extract the entire archive before running the application.

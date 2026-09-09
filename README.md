@@ -24,7 +24,7 @@ npm run test:desktop
 npm start
 ```
 
-`npm run dist` packages for the current OS. Native OS builds and signing still need verification.
+`npm run dist` packages for the current OS. Code signing and notarization are not configured.
 
 `test:desktop` runs the actual Electron shell with a temporary profile and an
 ephemeral, unfunded wallet. It never opens the user's existing wallet. It checks
@@ -54,9 +54,17 @@ the workflow file alone is not evidence that those jobs passed.
   KRC20 dApp transfers use type 4, atomic-unit string amounts and exactly one tick/ca identity. Review, persistent recovery and network checks precede broadcast. Deployment/mint and custom priority fees are not implemented; indexer balances are advisory, and live transfer outcomes remain unverified.
 - Safe-JSON PSKT 指定输入签名，保留其他 Covenant 输入；尚未覆盖所有 PSKT 格式。
   Selective Safe-JSON PSKT signing preserves other covenant inputs; not all PSKT formats are supported.
-- Pending: native KCC20 transfer adapters, broader provider compatibility, real dApp end-to-end tests, and Windows/Linux runtime verification.
+- Pending: native KCC20 transfer adapters, broader provider compatibility, real dApp end-to-end tests, and installed-package testing on end-user machines.
 
 51 automated tests currently pass. These include real local Schnorr verification, mock RPC and main-process request-route tests, not proof of production readiness or live token-transfer success.
+
+三平台验证 / Cross-platform validation: [CI run 34250818751](https://github.com/w00c00/kaspa-orbit/actions/runs/34250818751)
+at commit `d11f78482ace70dfbc2de4752e827d019c607e4d` passed on macOS, Windows and Linux.
+各平台均通过 51 项测试、实际 Electron 桌面冒烟测试和本机打包；测试覆盖临时钱包创建、锁定/解锁、隔离浏览器 provider、正常退出和清理。
+Each runner passed the 51 tests, the real Electron smoke test and native packaging.
+The smoke test uses a fresh unfunded wallet and an in-process HTTPS fixture, not
+a third-party dApp or a live token transfer. It does not validate installation of
+the packaged app, all CPU architectures, or every desktop environment.
 
 本地发送记录支持 EVM 回执和 Kaspa 节点接受列表查询，不将其视为最终性保证。已对 Igra 和 Kaspa 主网公开交易做过只读验证；Kasplex 实际回执验证仍待完成。Kaspa 新交易保存查询检查点，旧记录或已裁剪的历史可能无法验证。
 Local outgoing history supports EVM receipts and Kaspa node acceptance-list checks, not finality guarantees. Read-only public-transaction validation passed on Igra and Kaspa mainnet; live Kasplex receipts remain unverified. New Kaspa sends save a checkpoint; old or pruned history may be unverifiable.
