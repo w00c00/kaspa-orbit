@@ -9,10 +9,12 @@ contextBridge.executeInMainWorld({func:()=>{
   function provider(family){
     const listeners=new Map();
     const api={isNexus:true,
-      async request({method,params=[]}){
+      async request(args){
+        if(!args||typeof args!=='object'||Array.isArray(args))throw Object.assign(new Error('Invalid request'),{code:-32602});
+        const {method,params=[]}=args;
         if(typeof method!=='string'||!Array.isArray(params))throw Object.assign(new Error('Invalid request'),{code:-32602});
         const response=await transport.request(family,method,params);
-        if(response.error)throw Object.assign(new Error(response.error.message),{code:response.error.code});
+        if(response.error)throw Object.assign(new Error(response.error.message),{code:response.error.code,...(Object.hasOwn(response.error,'data')?{data:response.error.data}:{})});
         return response.result;
       },
       on(event,fn){if(typeof fn!=='function')throw new TypeError('Listener must be a function');const list=listeners.get(event)||[];list.push(fn);listeners.set(event,list);return api;},

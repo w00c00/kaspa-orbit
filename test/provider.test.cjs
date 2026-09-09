@@ -7,6 +7,11 @@ test('injected provider discovers, reports errors and removes event listeners',a
   vm.runInNewContext(fs.readFileSync(require.resolve('../desktop/dapp-preload.cjs'),'utf8'),{require:name=>{assert.equal(name,'electron');return electron;}});
   assert.equal(announced.length,1);assert.equal(announced[0].provider,window.ethereum);events.get('eip6963:requestProvider')();assert.equal(announced.length,2);
   assert.equal(await window.ethereum.request({method:'eth_chainId'}),'0x97b4');
+  for(const invalid of [null,undefined,[],42])await assert.rejects(window.ethereum.request(invalid),error=>error.code===-32602);
+  const originalInvoke=electron.ipcRenderer.invoke;
+  electron.ipcRenderer.invoke=async()=>({error:{code:3,message:'execution reverted',data:'0xdeadbeef'}});
+  await assert.rejects(window.ethereum.request({method:'eth_call',params:[]}),error=>error.code===3&&error.data==='0xdeadbeef');
+  electron.ipcRenderer.invoke=originalInvoke;
   await assert.rejects(window.ethereum.request({method:'eth_requestAccounts'}),error=>error.code===4001);
   let changes=0;const listener=()=>changes++;assert.equal(window.ethereum.on('accountsChanged',listener),window.ethereum);
   callbacks[0](null,{family:'evm',event:'accountsChanged',value:[]});assert.equal(changes,1);

@@ -313,6 +313,6 @@ ipcMain.handle('dapp-request',async(event,{family,method,params})=>{
       }finally{transactionBusy=false;}
     }
     return {error:{code:4200,message:`Unsupported method: ${method}`}};
-  }catch(error){return {error:{code:Number.isInteger(error.code)?error.code:-32603,message:error.message}};}
+  }catch(error){return {error:{code:Number.isInteger(error.code)?error.code:-32603,message:error.message,...(Object.hasOwn(error,'data')?{data:error.data}:{})}};}
 });
 app.on('window-all-closed',()=>app.quit());

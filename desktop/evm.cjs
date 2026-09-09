@@ -12,7 +12,7 @@ class EvmService {
   async rpc(method,params=[],network=this.network){
     const response=await this.transport(this.rpcOverrides?.[network.id]||network.rpc,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal:AbortSignal.timeout(20000),redirect:'error'});
     if(!response.ok)throw Error(`RPC HTTP ${response.status}`);
-    const body=await response.json();if(body.error)throw Object.assign(Error(body.error.message),{code:body.error.code});
+    const body=await response.json();if(body.error)throw Object.assign(Error(body.error.message),{code:body.error.code,...(Object.hasOwn(body.error,'data')?{data:body.error.data}:{})});
     if(!Object.hasOwn(body,'result'))throw Error('Malformed RPC response');return body.result;
   }
   async verify(network=this.network){if(quantity(await this.rpc('eth_chainId',[],network))!==BigInt(network.chainId))throw Error('RPC returned wrong chain / 节点网络不匹配');}
