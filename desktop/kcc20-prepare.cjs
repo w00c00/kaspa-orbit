@@ -3,9 +3,9 @@ const {ordinaryFunding}=require('./utxo-identity.cjs');
 const {assembleAddressTransfer}=require('./kcc20-assemble.cjs');
 const {recheckCovenantInputs}=require('./covenant-preflight.cjs');
 const {requireTn10Toccata}=require('./kcc20-network.cjs');
-async function prepareAddressTransfer(service,sourcePlan,sourceOptions){
+async function prepareAddressTransfer(service,sourcePlan,sourceOptions,valid=()=>true){
  const plan=structuredClone(sourcePlan),options=structuredClone(sourceOptions),revision=service.revision;
- const current=()=>{if(service.network!==plan.network||service.revision!==revision)throw Error('Network changed during token funding');};current();
+ const current=()=>{if(!valid())throw Error('Wallet context changed during token funding');if(service.network!==plan.network||service.revision!==revision)throw Error('Network changed during token funding');};current();
  if(plan.network!=='testnet-10'||!/^[a-f0-9]{64}$/.test(options.owner))throw Error('TN10 owner required');
  const script=new w.ScriptPublicKey(0,'20'+options.owner+'ac');let address;
  try{
@@ -25,7 +25,10 @@ async function prepareAddressTransfer(service,sourcePlan,sourceOptions){
   },plan.network);current();
   let selected,draft,lastError;
   const automatic=options.feeSompi===undefined||options.feeSompi==='';
+  let attempted=0;
   for(const funding of candidates){
+   if(attempted++%32===0)await new Promise(resolve=>setImmediate(resolve));
+   current();
    try{
     const attempt={...options,feeSompi:automatic?'1':options.feeSompi};
     // Rebuild because changing the fee changes the KAS change and storage mass.

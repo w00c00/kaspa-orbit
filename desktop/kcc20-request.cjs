@@ -19,7 +19,7 @@ async function prepareTransferRequest({service,source,identity,args,valid}){
  const check=()=>{if(!valid()||service.network!==network||service.revision!==revision)throw Error('KCC20 wallet context changed');};check();
  const candidates=await source.cells(network,request.covenantId,{owner:'03'+owner,limit:100});check();
  const plan=await planAddressTransfer(service,{network,covenantId:request.covenantId,owner,recipient:request.recipient,amount:request.amount,cells:candidates.cells});check();
- const prepared=await prepareAddressTransfer(service,plan,{owner,feeSompi:request.feeSompi});check();
+ const prepared=await prepareAddressTransfer(service,plan,{owner,feeSompi:request.feeSompi},valid);check();
  return {prepared,request};
 }
 module.exports={transferRequest,prepareTransferRequest};

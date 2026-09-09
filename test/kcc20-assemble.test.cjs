@@ -37,6 +37,10 @@ test('automatic KCC20 funding excludes covenant and coinbase outputs and recheck
  }},{networkId:'testnet-10',isSynced:true,hasUtxoIndex:true,virtualDaaScore:467579632n})};
  const prepared=await prepareAddressTransfer(service,f.plan,f.options);
  assert.equal(calls,2);assert.equal(prepared.funding.covenantId,null);assert.equal(prepared.requiresApproval,true);
+ calls=0;let active=true;
+ const preparing=prepareAddressTransfer(service,f.plan,f.options,()=>active);
+ setImmediate(()=>{active=false;});
+ await assert.rejects(preparing,/Wallet context changed/);
  calls=0;service.withRpc=fn=>fn({getUtxosByAddresses:async()=>({entries:[{...funding,covenantId:f.plan.covenantId}]})},{networkId:'testnet-10',isSynced:true,hasUtxoIndex:true,virtualDaaScore:467579632n});
  await assert.rejects(prepareAddressTransfer(service,f.plan,f.options),/No suitable/);
 });
