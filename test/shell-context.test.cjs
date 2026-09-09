@@ -10,3 +10,12 @@ test('initiating wallet selection invalidates pending reads before backend notif
  const s=shell(),old=s.api.invoke('balance'),switching=s.api.invoke('wallet-select',{id:'example'});
  s.pending[0].resolve({balance:'old'});await assert.rejects(old,/changed/);s.pending[1].resolve(true);assert.equal(await switching,true);
 });
+test('disconnect and revoke invalidate pending permission reads',async()=>{
+ for(const method of ['disconnect','revoke']){
+  const s=shell(),old=s.api.invoke('permissions'),change=s.api.invoke(method);
+  s.pending[0].resolve([{origin:'https://previous.test',family:'evm'}]);
+  await assert.rejects(old,/changed/);
+  s.pending[1].resolve(true);await change;
+  const fresh=s.api.invoke('permissions');s.pending[2].resolve([]);assert.equal((await fresh).length,0);
+ }
+});

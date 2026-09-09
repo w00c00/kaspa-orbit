@@ -18,7 +18,7 @@ async function refresh(){current=await window.nexus.invoke('status');const addin
 $('wallet-form').onsubmit=e=>{e.preventDefault();action(async()=>{const password=$('password').value,phrase=$('import').value,adding=addingWallet||!current.exists;if(adding&&password!==$('password-confirm').value)throw Error('两次密码不一致 / Passwords do not match');const name=$('wallet-name').value;clearSecrets();$('submit').disabled=true;try{if(!adding)await window.nexus.invoke('unlock',{password});else{const result=await window.nexus.invoke('wallet-add',{name,password,phrase});addingWallet=false;if(result.phrase){$('phrase').textContent=result.phrase;$('recovery').hidden=false;}$('status').textContent='钱包已保存，请备份后解锁 / Wallet saved. Back up, then unlock.';}await refresh();}finally{$('submit').disabled=false;}});};
 $('backed-up').onclick=()=>{$('phrase').textContent='';$('recovery').hidden=true;};
 $('lock').onclick=()=>action(async()=>{await window.nexus.invoke('lock');$('phrase').textContent='';$('recovery').hidden=true;await refresh();});
-$('disconnect').onclick=()=>action(async()=>{await window.nexus.invoke('disconnect');$('status').textContent='已断开所有网站 / All sites disconnected';});
+$('disconnect').onclick=()=>action(async()=>{await window.nexus.invoke('disconnect');$('sites-list')?.replaceChildren();$('status').textContent='已断开所有网站 / All sites disconnected';});
 for(const id of ['kaspa-address','evm-address'])$(id).onclick=()=>action(async()=>{await navigator.clipboard.writeText($(id).textContent);$('status').textContent='已复制 / Copied';});
 $('browser-form').onsubmit=e=>{e.preventDefault();action(()=>window.nexus.invoke('browse',{url:$('url').value.includes('://')?$('url').value:`https://${$('url').value}`}));};
 const originalRefresh=refresh;
