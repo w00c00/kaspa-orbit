@@ -43,14 +43,23 @@ transaction preservation, wrong owner/network and changed review rejection.
 `scripts/probe-kcc20-signed.cjs` emits a synthetic signed transaction using a
 fresh ephemeral unfunded key. It never emits that key.
 
-A separate local Rust script-engine harness executed the generated single and
-merged transactions, and rejected altered change and missing signatures. That
+A separate local Rust script-engine harness executed the generated single,
+merged and partial (900 transferred, 100 returned) transactions, and rejected
+altered change and missing signatures for all three. The partial transaction
+uses Toccata mass mode and an explicit 200000-sompi synthetic fee. That
 harness is not bundled in this repository or run by its CI; do not conflate
 this local evidence with a reproducible CI consensus validation gate.
 
+The TN10 form now defaults to local minimum-fee estimation (1 sompi/mass),
+rebuilding the change output until the fee covers the measured mass, with a
+bounded iteration count and 1-KAS cap. This is not a congestion estimate.
+An explicitly entered inadequate fee is rejected, never silently increased.
+The node activation/sync/index check runs during preparation, after approval
+before key access, and again at submission. Node reports remain a trust boundary.
+
 ## Remaining integration gates
 
-The preparation/authorization/submission components have isolated tests but are
+The preparation/authorization/submission components have isolated tests and
 are connected to the TN10 wallet form. Real TN10 end-to-end tests, recovery UX,
 portable engine-test provenance and independent review remain outstanding.
 Do not enable mainnet signing on the strength of these unit tests alone.

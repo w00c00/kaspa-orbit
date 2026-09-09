@@ -11,9 +11,10 @@ try{
  const script=w.payToScriptHashScript(program);const scriptPublicKey='0000'+script.script;script.free();
  const count=process.argv[2]==='merge'?2:1;
  const inputs=Array.from({length:count},(_,index)=>({transactionId:'bb'.repeat(32),index,covenantId,programHex:program,valueSompi:'50000000',blockDaaScore:'1',scriptPublicKey}));
- const outputs=[{covenantId,owner,amount:String(count*1000),programHex:encodeOrdinaryOutput(program,{owner,identifierType:3,amount:String(count*1000)})}];
+ const amounts=process.argv[2]==='split'?[900,100]:[count*1000];
+ const outputs=amounts.map(amount=>({covenantId,owner,amount:String(amount),programHex:encodeOrdinaryOutput(program,{owner,identifierType:3,amount:String(amount)})}));
  const funding={transactionId:'cc'.repeat(32),index:0,covenantId:null,valueSompi:'100000000',blockDaaScore:'1',scriptPublicKey:'000020'+owner+'ac',isCoinbase:false};
- const plan={network:'testnet-10',covenantId,inputs,outputs},options={owner,feeSompi:'100000'};
+ const plan={network:'testnet-10',covenantId,inputs,outputs},options={owner,feeSompi:'200000',isToccataActive:true};
  const draft=assembleAddressTransfer(plan,funding,options);
  process.stdout.write(signAddressTransfer(plan,funding,options,draft.transaction,key).transaction);
 }finally{x.free();pub.free();key.free();}
