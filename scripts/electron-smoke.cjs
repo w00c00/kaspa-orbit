@@ -87,12 +87,15 @@ app.on('browser-window-created',(_event,window)=>{
    const expectedAccount=(await window.webContents.executeJavaScript("window.nexus.invoke('status')")).accounts.evm;
    const testMessage='Orbit isolated desktop signature test',messageHex='0x'+Buffer.from(testMessage).toString('hex');
    const expectedReview=`Sign message / 签署消息\nAccount: ${expectedAccount}\n${testMessage}\n\nHex: ${messageHex}`;
-   const originalDialog=dialog.showMessageBox;let accountApprovals=0,messageApprovals=0;
+   const typed={domain:{name:'Orbit isolated test',version:'1',chainId:38833},types:{TestMessage:[{name:'note',type:'string'}]},primaryType:'TestMessage',message:{note:'No asset authorization; offline test only'}};
+   const typedReview=`Sign typed data / 签署结构化数据\nIgra Mainnet\n${JSON.stringify(typed,null,2)}`;
+   const originalDialog=dialog.showMessageBox;let accountApprovals=0,messageApprovals=0,typedApprovals=0;
    dialog.showMessageBox=async(_window,options)=>{
     if(options.message==='https://nexus-smoke.test'&&options.detail==='Allow this site to see your evm address? / 允许网站查看钱包地址？'){
      accountApprovals++;return {response:1};
     }
     if(options.message==='https://nexus-smoke.test'&&options.detail===expectedReview){messageApprovals++;return {response:1};}
+    if(options.message==='https://nexus-smoke.test'&&options.detail===typedReview){typedApprovals++;return {response:1};}
     return {response:0};
    };
    try{
@@ -104,16 +107,20 @@ app.on('browser-window-created',(_event,window)=>{
      const accounts=await ethereum.request({method:'eth_accounts'});assert(accounts.length===1&&/^0x[0-9a-fA-F]{40}$/.test(accounts[0]),'connected account missing');
      assert((await ethereum.request({method:'wallet_getPermissions'})).length===1,'permission query mismatch');
      const signature=await ethereum.request({method:'personal_sign',params:[${JSON.stringify(messageHex)},accounts[0]]});
+     const typed=${JSON.stringify(typed)},wrong={...typed,domain:{...typed.domain,chainId:1}};
+     let rejected=false;try{await ethereum.request({method:'eth_signTypedData_v4',params:[accounts[0],JSON.stringify(wrong)]});}catch(error){rejected=/chain mismatch/.test(error.message);}assert(rejected,'wrong-chain typed signing accepted');
+     const typedSignature=await ethereum.request({method:'eth_signTypedData_v4',params:[accounts[0],JSON.stringify(typed)]});
      let cleared=false;const listener=accounts=>{if(accounts.length===0)cleared=true;};ethereum.on('accountsChanged',listener);
      await ethereum.request({method:'wallet_revokePermissions',params:[{eth_accounts:{}}]});
      for(let i=0;i<20&&!cleared;i++)await new Promise(r=>setTimeout(r,25));
      ethereum.removeListener('accountsChanged',listener);assert(cleared,'disconnect event missing');
      assert((await ethereum.request({method:'eth_accounts'})).length===0,'account remained connected');
      assert((await ethereum.request({method:'wallet_getPermissions'})).length===0,'permission remained granted');
-     return {account:accounts[0],signature};
+     return {account:accounts[0],signature,typedSignature};
     })()`);
     if(accountApprovals!==1)throw Error('Unexpected number of connection approvals');
     if(messageApprovals!==1||connection.account!==expectedAccount||require('ethers').verifyMessage(testMessage,connection.signature)!==expectedAccount)throw Error('Desktop signature verification failed');
+    if(typedApprovals!==1||require('ethers').verifyTypedData(typed.domain,typed.types,typed.message,connection.typedSignature)!==expectedAccount)throw Error('Desktop typed signature verification failed');
    }finally{dialog.showMessageBox=originalDialog;await window.webContents.executeJavaScript("window.nexus.invoke('lock')");}
    phase('EVM connect/sign/verify/revoke lifecycle verified');
    finish();
