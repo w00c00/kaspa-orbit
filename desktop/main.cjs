@@ -7,7 +7,7 @@ const {evmReceipt}=require('./receipts.cjs');
 const {kaspaReceipt}=require('./kaspa-receipts.cjs');
 const {sendKaspa,messageRequest}=require('./kaspa-provider.cjs');
 const {sendKrc20}=require('./krc20-provider.cjs');
-const {inspectPskt,verifyOwnedInputs,signSelected}=require('./pskt.cjs');
+const {inspectPskt,signSelected,authorizePskt}=require('./pskt.cjs');
 const {prepareKrc20,signKrc20}=require('./krc20.cjs');
 const {Krc20Operations}=require('./operations.cjs');
 const {Kcc20Source}=require('./kcc20.cjs');
@@ -278,9 +278,9 @@ ipcMain.handle('dapp-request',async(event,{family,method,params})=>{
     }
     if(family==='kaspa'&&method==='signPskt'){
       const prepared=inspectPskt(params?.[0],accounts.kaspa.address);
-      await verifyOwnedInputs(prepared,kaspaService);
-      await approve(origin,`${kaspaService.network}\n${prepared.summary}`,valid);
-      return {result:vault.withKaspaKey(key=>signSelected(prepared,key))};
+      return {result:await authorizePskt({prepared,service:kaspaService,valid,
+        approve:summary=>approve(origin,`${kaspaService.network}\n${summary}`,valid),
+        sign:reviewed=>vault.withKaspaKey(key=>signSelected(reviewed,key))})};
     }
     if(family==='evm'&&method==='wallet_switchEthereumChain'){
       const next=NETWORKS.find(n=>hex(n.chainId)===String(params?.[0]?.chainId).toLowerCase());

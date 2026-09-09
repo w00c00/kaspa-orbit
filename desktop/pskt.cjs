@@ -43,4 +43,12 @@ function signSelected(prepared,key){
  const tx=wasm.Transaction.deserializeFromSafeJSON(prepared.unsigned);
  try{const inputs=tx.inputs;for(const {index,sighashType} of prepared.signInputs){if(sighashType!==1)throw Error("Only wire SIGHASH_ALL (1) is supported");inputs[index].signatureScript=wasm.createInputSignature(tx,index,key,wasm.SighashType.All);}tx.inputs=inputs;tx.finalize();const normalized=JSON.parse(tx.serializeToSafeJSON()),result=JSON.parse(prepared.sourceJson);result.id=normalized.id;for(const {index} of prepared.signInputs)result.inputs[index].signatureScript=normalized.inputs[index].signatureScript;return JSON.stringify(result);}finally{tx.free();}
 }
-module.exports={inspectPskt,verifyOwnedInputs,signSelected};
+async function authorizePskt({prepared,service,valid,approve,sign}){
+ const network=service.network,revision=service.revision;
+ const check=()=>{if(!valid()||network!==service.network||revision!==service.revision)throw Error('PSKT wallet or network context changed');};
+ check();await verifyOwnedInputs(prepared,service);check();
+ await approve(prepared.summary);check();
+ await verifyOwnedInputs(prepared,service);check();
+ return sign(prepared);
+}
+module.exports={inspectPskt,verifyOwnedInputs,signSelected,authorizePskt};

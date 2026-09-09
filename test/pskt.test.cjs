@@ -21,6 +21,13 @@ test('selective signing preserves covenant input, outputs and covenant bindings'
  const walletInput=data.inputs[1],scriptObject={version:0,script:walletInput.utxo.scriptPublicKey.slice(4)};
  const live={outpoint:{transactionId:walletInput.transactionId,index:walletInput.index},amount:BigInt(walletInput.utxo.amount),scriptPublicKey:scriptObject,isCoinbase:false,covenantId:null};
  const service={withRpc:fn=>fn({getUtxosByAddresses:async()=>({entries:[live]})})};await verifyOwnedInputs(prepared,service);
+ const {authorizePskt}=require('../desktop/pskt.cjs');let signedCount=0,active=true;
+ const authorize={prepared,service,valid:()=>active,approve:async()=>{},sign:()=>{signedCount++;return 'signed';}};
+ assert.equal(await authorizePskt(authorize),'signed');assert.equal(signedCount,1);
+ await assert.rejects(authorizePskt({...authorize,approve:async()=>{active=false;}}),/context changed/);assert.equal(signedCount,1);active=true;
+ const originalAmount=live.amount;
+ await assert.rejects(authorizePskt({...authorize,approve:async()=>{live.amount=1n;}}),/live wallet UTXO/);assert.equal(signedCount,1);live.amount=originalAmount;
+ await assert.rejects(authorizePskt({...authorize,approve:async()=>{service.revision=1;}}),/context changed/);assert.equal(signedCount,1);
  live.scriptPublicKey={...scriptObject,version:1};await assert.rejects(verifyOwnedInputs(prepared,service),/live wallet UTXO/);live.scriptPublicKey=scriptObject;
  live.covenantId=crypto.randomBytes(32).toString('hex');await assert.rejects(verifyOwnedInputs(prepared,service),/live wallet UTXO/);live.covenantId=null;
  const lockedChange=structuredClone(data);lockedChange.outputs=lockedChange.outputs.map(o=>({...o,covenant:{authorizingInput:0,covenantId:data.inputs[0].utxo.covenantId}}));
