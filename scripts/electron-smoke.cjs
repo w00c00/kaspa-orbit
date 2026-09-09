@@ -84,31 +84,38 @@ app.on('browser-window-created',(_event,window)=>{
    })()`);
    phase('isolated provider verified');
    await window.webContents.executeJavaScript(`window.nexus.invoke('unlock',{password:${JSON.stringify(password)}})`);
-   const originalDialog=dialog.showMessageBox;let accountApprovals=0;
+   const expectedAccount=(await window.webContents.executeJavaScript("window.nexus.invoke('status')")).accounts.evm;
+   const testMessage='Orbit isolated desktop signature test',messageHex='0x'+Buffer.from(testMessage).toString('hex');
+   const expectedReview=`Sign message / 签署消息\nAccount: ${expectedAccount}\n${testMessage}\n\nHex: ${messageHex}`;
+   const originalDialog=dialog.showMessageBox;let accountApprovals=0,messageApprovals=0;
    dialog.showMessageBox=async(_window,options)=>{
     if(options.message==='https://nexus-smoke.test'&&options.detail==='Allow this site to see your evm address? / 允许网站查看钱包地址？'){
      accountApprovals++;return {response:1};
     }
+    if(options.message==='https://nexus-smoke.test'&&options.detail===expectedReview){messageApprovals++;return {response:1};}
     return {response:0};
    };
    try{
-    await dapp.executeJavaScript(`(async()=>{
+    const connection=await dapp.executeJavaScript(`(async()=>{
      const assert=(ok,label)=>{if(!ok)throw Error(label);};
      assert((await ethereum.request({method:'eth_accounts'})).length===0,'account exposed before connection');
      const permissions=await ethereum.request({method:'wallet_requestPermissions',params:[{eth_accounts:{}}]});
      assert(permissions[0]?.parentCapability==='eth_accounts','account permission missing');
      const accounts=await ethereum.request({method:'eth_accounts'});assert(accounts.length===1&&/^0x[0-9a-fA-F]{40}$/.test(accounts[0]),'connected account missing');
      assert((await ethereum.request({method:'wallet_getPermissions'})).length===1,'permission query mismatch');
+     const signature=await ethereum.request({method:'personal_sign',params:[${JSON.stringify(messageHex)},accounts[0]]});
      let cleared=false;const listener=accounts=>{if(accounts.length===0)cleared=true;};ethereum.on('accountsChanged',listener);
      await ethereum.request({method:'wallet_revokePermissions',params:[{eth_accounts:{}}]});
      for(let i=0;i<20&&!cleared;i++)await new Promise(r=>setTimeout(r,25));
      ethereum.removeListener('accountsChanged',listener);assert(cleared,'disconnect event missing');
      assert((await ethereum.request({method:'eth_accounts'})).length===0,'account remained connected');
      assert((await ethereum.request({method:'wallet_getPermissions'})).length===0,'permission remained granted');
+     return {account:accounts[0],signature};
     })()`);
     if(accountApprovals!==1)throw Error('Unexpected number of connection approvals');
+    if(messageApprovals!==1||connection.account!==expectedAccount||require('ethers').verifyMessage(testMessage,connection.signature)!==expectedAccount)throw Error('Desktop signature verification failed');
    }finally{dialog.showMessageBox=originalDialog;await window.webContents.executeJavaScript("window.nexus.invoke('lock')");}
-   phase('EVM connect/query/revoke lifecycle verified');
+   phase('EVM connect/sign/verify/revoke lifecycle verified');
    finish();
   }catch(error){finish(error);}
  });
