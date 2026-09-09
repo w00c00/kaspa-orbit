@@ -7,6 +7,18 @@ function fixture(owner='11'.repeat(32)){const recipient='22'.repeat(32),covenant
  const output={covenantId,owner:recipient,amount:'1000',programHex:encodeOrdinaryOutput(program,{owner:recipient,identifierType:3,amount:'1000'})};
  return {plan:{network:'testnet-10',covenantId,inputs:[input],outputs:[output]},funding:{transactionId:'cc'.repeat(32),index:0,covenantId:null,valueSompi:'100000000',blockDaaScore:'1',scriptPublicKey:'000020'+owner+'ac',isCoinbase:false},options:{owner,feeSompi:'100000'}};
 }
+test('large funding candidate sets yield to cancellation before signing or recheck',async()=>{
+ const {prepareAddressTransfer}=require('../desktop/kcc20-prepare.cjs'),f=fixture();
+ const entries=Array.from({length:10000},(_,index)=>({outpoint:{transactionId:'cc'.repeat(32),index},amount:1n,blockDaaScore:1n,isCoinbase:false,covenantId:null,scriptPublicKey:{version:0,script:f.funding.scriptPublicKey.slice(4)}}));
+ let active=true,checks=0,queries=0;
+ const service={network:'testnet-10',revision:0,withRpc:fn=>fn({getUtxosByAddresses:async()=>{queries++;return {entries};}},{networkId:'testnet-10',isSynced:true,hasUtxoIndex:true,virtualDaaScore:467579632n})};
+ const pending=prepareAddressTransfer(service,f.plan,f.options,()=>{checks++;return active;});
+ // First yield resumes a batch; the next event-loop turn cancels the request.
+ setImmediate(()=>setImmediate(()=>{active=false;}));
+ await assert.rejects(pending,/Wallet context changed/);
+ assert.equal(queries,1,'must not query/sign a completed transaction after cancellation');
+ assert.ok(checks>10&&checks<100,'must process a bounded batch, not all 10000 candidates');
+});
 test('pre-sign node recheck binds every token and funding input to reviewed bytes',async()=>{
  const {recheckCovenantInputs}=require('../desktop/covenant-preflight.cjs');
  const {plan,funding,options}=fixture(),draft=assembleAddressTransfer(plan,funding,options);
