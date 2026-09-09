@@ -15,9 +15,12 @@ function harness(){
 }
 test('EVM revocation is scoped to requesting origin and works while locked',async()=>{
  const h=harness();h.grant();vm.runInContext("permissions.grant('https://example.test','evm');permissions.grant('https://other.test','evm')",h.context);
+ const listed=(await h.callEvm('wallet_getPermissions')).result;assert.equal(listed.length,1);assert.equal(listed[0].invoker,'https://example.test');assert.equal(listed[0].parentCapability,'eth_accounts');assert.equal(listed[0].caveats.length,0);
+ assert.equal((await h.callEvm('wallet_getPermissions',[{}])).error.code,-32602);
  for(const params of [[],[{}],[{eth_accounts:null}],[{eth_accounts:{extra:true}}],[{eth_accounts:{},other:{}}]])assert.equal((await h.callEvm('wallet_revokePermissions',params)).error.code,-32602);
  assert.equal(vm.runInContext("permissions.has('https://example.test','evm')",h.context),true);
  h.fakeVault.locked=true;
+ assert.equal((await h.callEvm('wallet_getPermissions')).result.length,0);
  assert.equal((await h.callEvm('wallet_revokePermissions',[{eth_accounts:{}}])).result,null);
  assert.equal(vm.runInContext("permissions.has('https://example.test','evm')",h.context),false);
  assert.equal(vm.runInContext("permissions.has('https://other.test','evm')",h.context),true);

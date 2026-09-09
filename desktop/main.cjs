@@ -232,6 +232,10 @@ ipcMain.handle('dapp-request',async(event,{family,method,params})=>{
     const revision=generation,frame=event.senderFrame;
     const valid=()=>!vault.locked&&generation===revision&&event.senderFrame===frame&&browser&&tabs.active===browser&&!browser.webContents.isDestroyed()&&browser.webContents.mainFrame===frame&&originOf(frame.url)===origin;
     if(!['kaspa','evm'].includes(family))throw Error('Unknown provider');
+    if(family==='evm'&&method==='wallet_getPermissions'){
+      if(params!==undefined&&(!Array.isArray(params)||params.length))throw Object.assign(Error('wallet_getPermissions takes no parameters'),{code:-32602});
+      return {result:!vault.locked&&permissions.has(origin,'evm')?[{invoker:origin,parentCapability:'eth_accounts',caveats:[]}]:[]};
+    }
     if(family==='evm'&&method==='wallet_revokePermissions'){
       const permission=params?.[0],scope=permission?.eth_accounts;
       if(!Array.isArray(params)||params.length!==1||!permission||Array.isArray(permission)||Object.keys(permission).length!==1||!Object.hasOwn(permission,'eth_accounts')||!scope||typeof scope!=='object'||Array.isArray(scope)||Object.keys(scope).length)throw Object.assign(Error('Expected [{eth_accounts:{}}]'),{code:-32602});
