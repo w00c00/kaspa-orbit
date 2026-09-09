@@ -47,6 +47,14 @@ No transaction was broadcast by the node probes or script-engine tests.
 
 ## Desktop permission and signing integration
 
+The actual Electron Kaspa provider path also passes an isolated lifecycle:
+address approval, public-key lookup, bilingual KIP-5 message signing, WASM
+verification and altered-message rejection, account-cleared disconnect event,
+and rejection of signing after revocation. Kaspa permission does not grant EVM
+permission. Only the exact fixed local test origin/message is auto-approved;
+the ephemeral profile is removed after exit. This is not a live third-party
+dApp login or a Kaspa transaction broadcast.
+
 The isolated Electron smoke now exercises the actual IPC/provider path with an
 ephemeral unfunded wallet: request account permission, query permission, sign a
 fixed personal message, sign a fixed EIP-712 test message, verify both signatures,

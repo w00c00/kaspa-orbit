@@ -103,6 +103,10 @@ app.on('browser-window-created',(_event,window)=>{
    phase('isolated provider verified');
    await window.webContents.executeJavaScript(`window.nexus.invoke('unlock',{password:${JSON.stringify(password)}})`);
    const expectedAccount=(await window.webContents.executeJavaScript("window.nexus.invoke('status')")).accounts.evm;
+   const expectedKaspa=(await window.webContents.executeJavaScript("window.nexus.invoke('status')")).accounts.kaspa;
+   const kaspaMessage='Orbit isolated Kaspa login test / 本地签名测试';
+   const kaspaReview=`Sign Kaspa message / 签署 Kaspa 消息\nKIP-5 · Schnorr (hex)\n${expectedKaspa.address}\n${kaspaMessage}`;
+   let kaspaConnections=0,kaspaSignatures=0;
    const testMessage='Orbit isolated desktop signature test',messageHex='0x'+Buffer.from(testMessage).toString('hex');
    const expectedReview=`Sign message / 签署消息\nAccount: ${expectedAccount}\n${testMessage}\n\nHex: ${messageHex}`;
    const typed={domain:{name:'Orbit isolated test',version:'1',chainId:38833},types:{TestMessage:[{name:'note',type:'string'}]},primaryType:'TestMessage',message:{note:'No asset authorization; offline test only'}};
@@ -110,6 +114,8 @@ app.on('browser-window-created',(_event,window)=>{
    const transactionReview=`Igra Mainnet\nFrom / 发出: ${expectedAccount}\nTo / 接收: ${expectedAccount}\nValue / 金额: 0.000000000000000001 iKAS\nMaximum fee / 最高手续费: 0.0000000000000252 iKAS\nNonce: 0\nData / 调用数据: 0x`;
    const originalDialog=dialog.showMessageBox;let accountApprovals=0,messageApprovals=0,typedApprovals=0,transactionApprovals=0;
    dialog.showMessageBox=async(_window,options)=>{
+    if(options.message==='https://nexus-smoke.test'&&options.detail==='Allow this site to see your kaspa address? / 允许网站查看钱包地址？'){kaspaConnections++;return {response:1};}
+    if(options.message==='https://nexus-smoke.test'&&options.detail===kaspaReview){kaspaSignatures++;return {response:1};}
     if(options.message==='https://nexus-smoke.test'&&options.detail==='Allow this site to see your evm address? / 允许网站查看钱包地址？'){
      accountApprovals++;return {response:1};
     }
@@ -119,6 +125,26 @@ app.on('browser-window-created',(_event,window)=>{
     return {response:0};
    };
    try{
+    const native=await dapp.executeJavaScript(`(async()=>{
+     const assert=(ok,label)=>{if(!ok)throw Error(label);};
+     assert((await kasware.getAccounts()).length===0,'Kaspa account leaked before approval');
+     const accounts=await kasware.requestAccounts();
+     assert(accounts.length===1,'Kaspa connection account missing');
+     assert((await ethereum.request({method:'eth_accounts'})).length===0,'Kaspa approval also authorized EVM');
+     const publicKey=await kasware.getPublicKey();
+     const signature=await kasware.signMessage(${JSON.stringify(kaspaMessage)},{type:'schnorr',noAuxRand:true});
+     let cleared=false;const listener=accounts=>{if(accounts.length===0)cleared=true;};kasware.on('accountsChanged',listener);
+     await kasware.disconnect();
+     for(let i=0;i<20&&!cleared;i++)await new Promise(r=>setTimeout(r,25));
+     kasware.removeListener('accountsChanged',listener);
+     assert(cleared&&(await kasware.getAccounts()).length===0,'Kaspa disconnect failed');
+     let denied=false;try{await kasware.signMessage('after revocation');}catch(error){denied=error.code===4100;}
+     assert(denied,'Kaspa signing allowed after revocation');
+     return {address:accounts[0],publicKey,signature};
+    })()`);
+    const wasm=require('@kluster/kaspa-wasm');
+    if(kaspaConnections!==1||kaspaSignatures!==1||native.address!==expectedKaspa.address||native.publicKey!==expectedKaspa.publicKey||!wasm.verifyMessage({message:kaspaMessage,signature:native.signature,publicKey:native.publicKey})||wasm.verifyMessage({message:kaspaMessage+'altered',signature:native.signature,publicKey:native.publicKey}))throw Error('Desktop Kaspa signature/permission verification failed');
+    phase('Kaspa connect/sign/verify/disconnect lifecycle verified');
     const connection=await dapp.executeJavaScript(`(async()=>{
      const assert=(ok,label)=>{if(!ok)throw Error(label);};
      assert((await ethereum.request({method:'eth_accounts'})).length===0,'account exposed before connection');
