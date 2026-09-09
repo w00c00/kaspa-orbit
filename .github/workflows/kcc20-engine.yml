@@ -3,7 +3,9 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'desktop/**'
+      - 'desktop/kcc20*.cjs'
+      - 'desktop/covenant-*.cjs'
+      - 'desktop/utxo-identity.cjs'
       - 'test/engine/**'
       - 'test/fixtures/kcc20-2433.json'
       - 'scripts/*kcc20*'
@@ -11,7 +13,9 @@ on:
       - '.github/workflows/kcc20-engine.yml'
   pull_request:
     paths:
-      - 'desktop/**'
+      - 'desktop/kcc20*.cjs'
+      - 'desktop/covenant-*.cjs'
+      - 'desktop/utxo-identity.cjs'
       - 'test/engine/**'
       - 'test/fixtures/kcc20-2433.json'
       - 'scripts/*kcc20*'
