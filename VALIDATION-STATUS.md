@@ -9,6 +9,18 @@ Electron smoke. Passing an old upstream checkout to the runner was separately
 confirmed to fail before compilation. See [v1 migration](SILVERSCRIPT-V1.md).
 These are local source checks, not updated release assets or live transfers.
 
+Package source verification can be repeated without opening a real wallet:
+
+```sh
+node scripts/verify-packaged-source.cjs /path/to/app.asar COMMIT
+```
+
+The verifier compares all tracked desktop/UI files and rejects unexpected files
+in those directories. It was tested against the 4e9fb75 macOS CI package: all 49
+files matched that commit, while comparison with dcb51fd correctly failed at
+`desktop/kcc20-prepare.cjs`. This verifies source content, not dependencies,
+code signing, installation behavior or transaction safety.
+
 - `169f2b2`: local Node suite has 80 passing tests; isolated Electron smoke passed.
 - `d16a77a`: macOS, Windows and Linux desktop CI passed (run `34334814463`).
 - `2d522d6`: pinned Kaspa script-engine CI passed four selected groups / 28
