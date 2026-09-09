@@ -36,7 +36,7 @@ function signKrc20(prepared,vault){
  const commit=vault.signKaspaTransaction(prepared.commit,prepared.address,prepared.network);
  const reveal=w.Transaction.deserializeFromSafeJSON(prepared.reveal);
  try{
-  vault.withKaspaKey(key=>{const inputs=reveal.inputs;if(inputs.length!==1)throw Error('Invalid reveal input count');inputs[0].signatureScript=w.payToScriptHashSignatureScript(prepared.redeemScript,w.createInputSignature(reveal,0,key,1));reveal.inputs=inputs;reveal.finalize();});
+  vault.withKaspaKey(key=>{const inputs=reveal.inputs;if(inputs.length!==1)throw Error('Invalid reveal input count');inputs[0].signatureScript=w.payToScriptHashSignatureScript(prepared.redeemScript,w.createInputSignature(reveal,0,key,w.SighashType.All));reveal.inputs=inputs;reveal.finalize();});
   if(!w.updateTransactionMass(prepared.network,reveal,1))throw Error('Reveal exceeds standard transaction mass');
   const input=BigInt(prepared.deposit),output=reveal.outputs.reduce((n,o)=>n+o.value,0n),mass=w.calculateTransactionMass(prepared.network,reveal,1);
   if(input-output<mass)throw Error('Reveal fee below calculated mass');

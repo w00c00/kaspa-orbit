@@ -25,6 +25,7 @@ test('selective signing preserves covenant input, outputs and covenant bindings'
  live.covenantId=crypto.randomBytes(32).toString('hex');await assert.rejects(verifyOwnedInputs(prepared,service),/live wallet UTXO/);live.covenantId=null;
  const lockedChange=structuredClone(data);lockedChange.outputs=lockedChange.outputs.map(o=>({...o,covenant:{authorizingInput:0,covenantId:data.inputs[0].utxo.covenantId}}));
  const lockedReview=inspectPskt({...request,txJsonString:JSON.stringify(lockedChange)},address);assert.match(lockedReview.summary,/普通钱包找零: 0\.00000000 KAS/);
+ assert.equal(signed.inputs[1].signatureScript.slice(-2),'01','Wire signature must use ALL, not WASM enum None');
  assert.ok(Object.isFrozen(prepared.signInputs));
  }finally{key.free();for(const tx of generated?.transactions||[])tx.free();generated?.summary.free();}
 });

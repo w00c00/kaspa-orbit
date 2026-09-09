@@ -2,6 +2,12 @@
 
 Kaspa Orbit · Release state: **Draft + Pre-release**.
 
+> **Security hold / 安全暂停：**现有附件尚未包含 SIGHASH 映射修复，请勿使用这些
+> 安装包进行 KRC20 转账或 PSKT 签名。原调用误把 WASM 枚举 `None=1` 当成链上
+> `SIGHASH_ALL=0x01`。源码已改为显式 `SighashType.All`，附件待重建及验证。
+> Existing assets do not contain the sighash mapping fix. Do not use them for
+> KRC20 transfers or PSKT signing. Rebuilt, verified assets are pending.
+
 ## 中文
 
 首个开发预览版：跨平台 Kaspa 生态桌面钱包，集成隔离的 dApp 浏览器。
@@ -53,9 +59,8 @@ safety. Prefer TN10 with valueless test funds; do not import a savings wallet.
 ## Downloads / 下载
 
 Validation evidence / 验证记录: [CI run 34250818751](https://github.com/w00c00/kaspa-orbit/actions/runs/34250818751).
-This run tests source commit `d11f784`; the draft binaries contain the same
-`desktop/` and `ui/` sources. Subsequent changes fixed only the test harness and CI.
-此 CI 验证源码版本与草稿安装包的 `desktop/` 和 `ui/` 内容相同；期间仅调整测试工具及 CI。
+This historical run tests commit `d11f784`. It predates the sighash fix and
+does not validate the fixed build. 此历史记录早于签名修复，不代表修复版安装包已验证。
 
 Choose the asset matching your OS and CPU architecture. Windows ZIP builds are
 portable; extract the entire archive before running the application.
