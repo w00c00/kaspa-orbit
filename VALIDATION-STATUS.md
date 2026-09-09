@@ -34,8 +34,11 @@ ephemeral unfunded wallet: request account permission, query permission, sign a
 fixed personal message, sign a fixed EIP-712 test message, verify both signatures,
 and revoke permission with an empty-account event. Wrong-chain typed data is
 rejected. The test approves only the exact fixture origin and exact test prompts;
-other prompts are rejected. No remote website receives these signatures, and no
-transaction is built or broadcast. Temporary wallet data is removed on exit.
+other prompts are rejected. No remote website receives these signatures.
+The smoke also builds/signs a synthetic 1-wei self-transfer through the desktop
+IPC route. Main-process fetch is fully intercepted with no network fallback;
+the mock RPC checks the signed sender, recipient, value, chain ID and hash.
+No transaction reaches a real node. Temporary wallet data is removed on exit.
 
 ## Public-page browser probe
 

@@ -3,6 +3,19 @@ const {app,session,webContents,dialog}=require('electron');const crypto=require(
 const profile=process.env.ORBIT_SMOKE_PROFILE;
 if(!profile)throw Error('Use npm run test:desktop to create an isolated disposable profile');
 app.setPath('userData',profile);app.setPath('sessionData',profile);
+let submittedTransaction;
+// No fallback to the network: all main-process fetch calls are intercepted.
+globalThis.fetch=async(url,options)=>{
+ if(String(url)!=='https://rpc.igralabs.com:8545')throw Error('Unexpected test fetch destination');
+ const request=JSON.parse(options.body),{method,params}=request;
+ const results={eth_chainId:'0x97b1',eth_getTransactionCount:'0x0',eth_gasPrice:'0x1',eth_estimateGas:'0x5208',eth_getBalance:'0xde0b6b3a7640000'};
+ let result;
+ if(method==='eth_sendRawTransaction'){
+  if(submittedTransaction)throw Error('Unexpected duplicate test submission');
+  submittedTransaction=require('ethers').Transaction.from(params[0]);result=submittedTransaction.hash;
+ }else if(Object.hasOwn(results,method))result=results[method];else throw Error('Unexpected test RPC method: '+method);
+ return Response.json({jsonrpc:'2.0',id:request.id,result});
+};
 const password=crypto.randomBytes(24).toString('hex');
 const phase=label=>console.log('SMOKE phase: '+label);
 phase('temporary profile configured');
@@ -89,13 +102,15 @@ app.on('browser-window-created',(_event,window)=>{
    const expectedReview=`Sign message / 签署消息\nAccount: ${expectedAccount}\n${testMessage}\n\nHex: ${messageHex}`;
    const typed={domain:{name:'Orbit isolated test',version:'1',chainId:38833},types:{TestMessage:[{name:'note',type:'string'}]},primaryType:'TestMessage',message:{note:'No asset authorization; offline test only'}};
    const typedReview=`Sign typed data / 签署结构化数据\nIgra Mainnet\n${JSON.stringify(typed,null,2)}`;
-   const originalDialog=dialog.showMessageBox;let accountApprovals=0,messageApprovals=0,typedApprovals=0;
+   const transactionReview=`Igra Mainnet\nFrom / 发出: ${expectedAccount}\nTo / 接收: ${expectedAccount}\nValue / 金额: 0.000000000000000001 iKAS\nMaximum fee / 最高手续费: 0.0000000000000252 iKAS\nNonce: 0\nData / 调用数据: 0x`;
+   const originalDialog=dialog.showMessageBox;let accountApprovals=0,messageApprovals=0,typedApprovals=0,transactionApprovals=0;
    dialog.showMessageBox=async(_window,options)=>{
     if(options.message==='https://nexus-smoke.test'&&options.detail==='Allow this site to see your evm address? / 允许网站查看钱包地址？'){
      accountApprovals++;return {response:1};
     }
     if(options.message==='https://nexus-smoke.test'&&options.detail===expectedReview){messageApprovals++;return {response:1};}
     if(options.message==='https://nexus-smoke.test'&&options.detail===typedReview){typedApprovals++;return {response:1};}
+    if(options.message==='https://nexus-smoke.test'&&options.detail===transactionReview){transactionApprovals++;return {response:1};}
     return {response:0};
    };
    try{
@@ -110,17 +125,19 @@ app.on('browser-window-created',(_event,window)=>{
      const typed=${JSON.stringify(typed)},wrong={...typed,domain:{...typed.domain,chainId:1}};
      let rejected=false;try{await ethereum.request({method:'eth_signTypedData_v4',params:[accounts[0],JSON.stringify(wrong)]});}catch(error){rejected=/chain mismatch/.test(error.message);}assert(rejected,'wrong-chain typed signing accepted');
      const typedSignature=await ethereum.request({method:'eth_signTypedData_v4',params:[accounts[0],JSON.stringify(typed)]});
+     const transactionHash=await ethereum.request({method:'eth_sendTransaction',params:[{from:accounts[0],to:accounts[0],value:'0x1'}]});
      let cleared=false;const listener=accounts=>{if(accounts.length===0)cleared=true;};ethereum.on('accountsChanged',listener);
      await ethereum.request({method:'wallet_revokePermissions',params:[{eth_accounts:{}}]});
      for(let i=0;i<20&&!cleared;i++)await new Promise(r=>setTimeout(r,25));
      ethereum.removeListener('accountsChanged',listener);assert(cleared,'disconnect event missing');
      assert((await ethereum.request({method:'eth_accounts'})).length===0,'account remained connected');
      assert((await ethereum.request({method:'wallet_getPermissions'})).length===0,'permission remained granted');
-     return {account:accounts[0],signature,typedSignature};
+     return {account:accounts[0],signature,typedSignature,transactionHash};
     })()`);
     if(accountApprovals!==1)throw Error('Unexpected number of connection approvals');
     if(messageApprovals!==1||connection.account!==expectedAccount||require('ethers').verifyMessage(testMessage,connection.signature)!==expectedAccount)throw Error('Desktop signature verification failed');
     if(typedApprovals!==1||require('ethers').verifyTypedData(typed.domain,typed.types,typed.message,connection.typedSignature)!==expectedAccount)throw Error('Desktop typed signature verification failed');
+    if(transactionApprovals!==1||submittedTransaction?.hash!==connection.transactionHash||submittedTransaction.from!==expectedAccount||submittedTransaction.to!==expectedAccount||submittedTransaction.value!==1n||submittedTransaction.chainId!==38833n)throw Error('Mock-RPC desktop transaction mismatch');
    }finally{dialog.showMessageBox=originalDialog;await window.webContents.executeJavaScript("window.nexus.invoke('lock')");}
    phase('EVM connect/sign/verify/revoke lifecycle verified');
    finish();
