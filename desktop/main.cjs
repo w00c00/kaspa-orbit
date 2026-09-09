@@ -240,6 +240,7 @@ ipcMain.handle('dapp-request',async(event,{family,method,params})=>{
     if(family==='evm'&&method==='eth_chainId')return {result:hex(evm.network.chainId)};
     if(family==='evm'&&method==='net_version')return {result:String(evm.network.chainId)};
     if(family==='evm'&&READ_METHODS.has(method))return {result:await evm.read(method,params)};
+    if(params!==undefined&&!Array.isArray(params))throw Object.assign(Error('This wallet method requires positional parameters'),{code:-32602});
     const accountMethods=family==='evm'?['eth_accounts','eth_requestAccounts']:['getAccounts','requestAccounts'];
     if(method===accountMethods[0]&&(!permissions.has(origin,family)||vault.locked))return {result:[]};
     if(vault.locked)throw Error('Unlock wallet in the sidebar / 请在侧栏解锁钱包');

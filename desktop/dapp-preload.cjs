@@ -12,7 +12,7 @@ contextBridge.executeInMainWorld({func:()=>{
       async request(args){
         if(!args||typeof args!=='object'||Array.isArray(args))throw Object.assign(new Error('Invalid request'),{code:-32602});
         const {method,params=[]}=args;
-        if(typeof method!=='string'||!Array.isArray(params))throw Object.assign(new Error('Invalid request'),{code:-32602});
+        if(typeof method!=='string'||(!Array.isArray(params)&&!(family==='evm'&&params!==null&&typeof params==='object')))throw Object.assign(new Error('Invalid request'),{code:-32602});
         const response=await transport.request(family,method,params);
         if(response.error)throw Object.assign(new Error(response.error.message),{code:response.error.code,...(Object.hasOwn(response.error,'data')?{data:response.error.data}:{})});
         return response.result;

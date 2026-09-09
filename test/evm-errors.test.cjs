@@ -1,5 +1,10 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {EvmService}=require('../desktop/evm.cjs');
+test('EVM read transport preserves named parameters without conversion',async()=>{
+ const params={transaction:{to:'0x0000000000000000000000000000000000000001'},block:'latest'};let observed;
+ const service=new EvmService(async(_url,options)=>{const request=JSON.parse(options.body);if(request.method==='eth_chainId')return Response.json({jsonrpc:'2.0',id:1,result:'0x97b1'});observed=request.params;return Response.json({jsonrpc:'2.0',id:1,result:'0x'});});
+ assert.equal(await service.read('eth_call',params),'0x');assert.deepEqual(observed,params);
+});
 test('EVM reads reject late results after network changes at either await boundary',async()=>{
  for(const phase of ['verify','read']){
   const service=new EvmService();let release,started;

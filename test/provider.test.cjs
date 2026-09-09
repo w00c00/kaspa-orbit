@@ -12,6 +12,11 @@ test('injected provider discovers, reports errors and removes event listeners',a
   electron.ipcRenderer.invoke=async()=>({error:{code:3,message:'execution reverted',data:'0xdeadbeef'}});
   await assert.rejects(window.ethereum.request({method:'eth_call',params:[]}),error=>error.code===3&&error.data==='0xdeadbeef');
   electron.ipcRenderer.invoke=originalInvoke;
+  const named={transaction:{to:'0x0000000000000000000000000000000000000001'},block:'latest'};
+  await assert.rejects(window.ethereum.request({method:'eth_call',params:named}),error=>error.code===4001);
+  assert.deepEqual(requests.at(-1).params,named);
+  for(const params of [null,1,'invalid'])await assert.rejects(window.ethereum.request({method:'eth_call',params}),error=>error.code===-32602);
+  await assert.rejects(window.kasware.request({method:'signMessage',params:{message:'hi'}}),error=>error.code===-32602);
   await assert.rejects(window.ethereum.request({method:'eth_requestAccounts'}),error=>error.code===4001);
   let changes=0;const listener=()=>changes++;assert.equal(window.ethereum.on('accountsChanged',listener),window.ethereum);
   callbacks[0](null,{family:'evm',event:'accountsChanged',value:[]});assert.equal(changes,1);
