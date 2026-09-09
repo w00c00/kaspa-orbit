@@ -30,6 +30,8 @@ function syncNetworkContext(){
   for(const id of ['krc20-list','kcc20-list','erc20-result','krc-send-panel','krc-recover-list','transfer-result','history-list'])$(id)?.replaceChildren();
   for(const id of ['balance','kaspa-balance'])if($(id))$(id).textContent='—';
   if($('krc20-next'))$('krc20-next').hidden=true;
+  if($('kcc20-send-form'))$('kcc20-send-form').reset();
+  if($('kcc20-send-status'))$('kcc20-send-status').textContent='';
  }
  if($('network-note'))$('network-note').textContent=current.kaspaNetwork==='mainnet'?'主网 · 真实资产，请核对交易 / Mainnet · Real funds':'TN10 · 仅测试资产 / Test assets only';
 }

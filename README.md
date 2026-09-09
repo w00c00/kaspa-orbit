@@ -54,7 +54,7 @@ the workflow file alone is not evidence that those jobs passed.
   KRC20 dApp transfers use type 4, atomic-unit string amounts and exactly one tick/ca identity. Review, persistent recovery and network checks precede broadcast. Deployment/mint and custom priority fees are not implemented; indexer balances are advisory, and live transfer outcomes remain unverified.
 - Safe-JSON PSKT 指定输入签名，保留其他 Covenant 输入；尚未覆盖所有 PSKT 格式。
   Selective Safe-JSON PSKT signing preserves other covenant inputs; not all PSKT formats are supported.
-- Pending: native KCC20 transfer adapters, broader provider compatibility, real dApp end-to-end tests, and installed-package testing on end-user machines.
+- The source includes a TN10-only experimental KCC20 address-owner transfer form. Mainnet transfers, broader provider compatibility, real dApp end-to-end tests, and installed-package testing remain pending.
 
 51 automated tests currently pass. These include real local Schnorr verification, mock RPC and main-process request-route tests, not proof of production readiness or live token-transfer success.
 
@@ -95,4 +95,4 @@ recovery phrase. Wallet deletion is not offered in this preview.
 - https://igra-labs.gitbook.io/igralabs-docs/quickstart/network-info
 - https://github.com/kaspanet/kccs
 
-SilverScript upstream observed on 2026-09-07: `c7d17a15ac88610d013ec9ffffa9520aeb69929b`. No native KCC20 transfer artifact is pinned or enabled yet; KCC20 holdings are currently indexer-reported rather than locally verified.
+Historical SilverScript upstream observation (2026-09-07): `c7d17a15ac88610d013ec9ffffa9520aeb69929b`, not a claim about current HEAD. Experimental transfer provenance and outstanding checks are documented in [KCC20-DEVELOPMENT.md](KCC20-DEVELOPMENT.md). Holdings remain indexer-reported; selected transfer inputs are separately checked against the node. Mainnet KCC20 sending remains disabled.

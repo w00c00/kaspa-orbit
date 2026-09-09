@@ -12,6 +12,9 @@ const {prepareKrc20,signKrc20}=require('./krc20.cjs');
 const {Krc20Operations}=require('./operations.cjs');
 const {Kcc20Source}=require('./kcc20.cjs');
 const kcc20Source=new Kcc20Source();
+const {prepareTransferRequest}=require('./kcc20-request.cjs');
+const {authorizeAddressTransfer}=require('./kcc20-authorize.cjs');
+const {submitAddressTransfer}=require('./kcc20-submit.cjs');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
 const {Vault}=require('./vault.cjs');
@@ -19,7 +22,7 @@ const {Wallets}=require('./wallets.cjs');
 const {Permissions,originOf}=require('./policy.cjs');
 const {EvmService,NETWORKS,READ_METHODS,hex,personalMessage}=require('./evm.cjs');
 const {formatEther,parseEther,getAddress,TypedDataEncoder}=require('ethers');
-const {KaspaService}=require('./kaspa.cjs');
+const {KaspaService,formatKas}=require('./kaspa.cjs');
 const kaspaService=new KaspaService();
 const {erc20Holding,krc20Holdings,prepareErc20Transfer}=require('./tokens.cjs');
 const evm=new EvmService();
@@ -142,6 +145,23 @@ async function walletUi(event,method,args={}){
     case 'kaspa-balance':if(vault.locked)throw Error('Unlock wallet first');return kaspaService.balance(vault.kaspaIdentity(kaspaService.network).address);
     case 'krc20-holdings':if(vault.locked)throw Error('Unlock wallet first');return krc20Holdings(kaspaService.network,vault.kaspaIdentity(kaspaService.network).address,args.next);
     case 'erc20-holding':if(vault.locked)throw Error('Unlock wallet first');return erc20Holding(evm,args.contract,vault.evm().address);
+    case 'kcc20-send':{
+      if(vault.locked)throw Error('Unlock wallet first / 请先解锁钱包');
+      if(walletBusy||networkBusy||transactionBusy||approvalBusy)throw Error('Finish pending requests first / 请先完成待处理请求');
+      if(kaspaService.network!=='testnet-10')throw Error('KCC20 experimental transfers require TN10 / 请切换到 TN10 测试网');
+      transactionBusy=true;const revision=generation,activeVault=vault;
+      const valid=()=>vault===activeVault&&!vault.locked&&generation===revision&&kaspaService.network==='testnet-10';
+      try{
+        const identity=vault.kaspaIdentity('testnet-10');
+        const {prepared,request}=await prepareTransferRequest({service:kaspaService,source:kcc20Source,identity,args,valid});
+        const signed=await authorizeAddressTransfer({service:kaspaService,prepared,vault,valid,approve:(summary,check)=>{
+          const review=JSON.parse(summary);
+          const detail=[`Network / 网络: TN10 (test assets only / 仅测试资产)`,`Covenant ID: ${review.covenantId}`,`Recipient / 收款地址: ${request.recipientAddress}`,`Transfer / 转出: ${request.amount} atomic units / 基础单位`,`Fee / 手续费: ${formatKas(review.feeSompi)} tKAS`,`KAS change / KAS 找零: ${formatKas(review.kasChangeSompi)} tKAS`,`Token outputs / 代币输出:`,...review.tokenOutputs.map((output,i)=>`${i+1}. ${output.atomicAmount} units → ${output.owner}`),`Carrier values / 输出承载 KAS: ${review.carrierSompi.map(formatKas).join(', ')} tKAS`].join('\n');
+          return approve('KCC20 · TN10 Experimental / 实验转账',detail,check);
+        }});
+        return await submitAddressTransfer({service:kaspaService,signed,address:identity.address,valid});
+      }finally{transactionBusy=false;}
+    }
     case 'kcc20-holdings':if(vault.locked)throw Error('Unlock wallet first');return kcc20Source.holdings(kaspaService.network,vault.kaspaIdentity(kaspaService.network).address);
     case 'kcc20-detail':return kcc20Source.token(kaspaService.network,args.covenantId);
     case 'krc20-operations':if(vault.locked)throw Error('Unlock wallet first');return operations.list(vault.kaspaIdentity(kaspaService.network).address,kaspaService.network);

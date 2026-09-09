@@ -37,6 +37,8 @@ app.on('browser-window-created',(_event,window)=>{
     document.getElementById('password').value=password;document.getElementById('wallet-form').requestSubmit();await wait(()=>!current.locked);
     assert(document.getElementById('accounts').checkVisibility(),'accounts visible after creation');
     assert(current.accounts.kaspa.address.startsWith('kaspa:'),'mainnet address');
+    assert(!!document.getElementById('kcc20-send-form'),'experimental KCC20 form missing');
+    let mainnetBlocked=false;try{await window.nexus.invoke('kcc20-send',{});}catch(error){mainnetBlocked=/TN10/.test(error.message);}assert(mainnetBlocked,'experimental token send must reject mainnet before RPC');
     const firstId=current.walletId,firstAddress=current.accounts.kaspa.address;
     document.getElementById('backed-up').click();assert(!document.getElementById('phrase').textContent,'backup phrase cleared');
     for(const id of ['send-form','krc20-load','erc20-form','kcc20-load','history-load'])assert(!!document.getElementById(id),id+' missing');

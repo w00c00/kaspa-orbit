@@ -1,7 +1,7 @@
 # KCC20 transfer development
 
-These modules are experimental building blocks, not an enabled wallet feature.
-The desktop UI and provider do not call them yet. Signing is restricted to TN10.
+The desktop source includes an experimental TN10 transfer form calling these
+modules. The dApp provider does not expose token sends. Signing is restricted to TN10.
 No real wallet, funding or broadcast was used for the recorded tests.
 
 ## Pipeline
@@ -51,14 +51,14 @@ this local evidence with a reproducible CI consensus validation gate.
 ## Remaining integration gates
 
 The preparation/authorization/submission components have isolated tests but are
-not connected to wallet IPC or UI. Real TN10 end-to-end tests, recovery UX,
+are connected to the TN10 wallet form. Real TN10 end-to-end tests, recovery UX,
 portable engine-test provenance and independent review remain outstanding.
 Do not enable mainnet signing on the strength of these unit tests alone.
 
 ## 中文摘要
 
-这些是开发中的底层组件，尚未接入钱包界面或 dApp API。签名仅允许 TN10，
+这些是开发中的组件，已接入源码中的 TN10 实验表单，未开放 dApp API。签名仅允许 TN10，
 测试使用临时无资金密钥和合成交易。节点复核不代表锁定 UTXO，也不代表完整
 共识验证。选币、审核和广播边界已实现独立组件，但真实测试网全流程、
-授权界面接入、广播恢复体验和独立审查
+完整授权流程实测、广播恢复体验和独立审查
 尚未完成，不能据此声称主网可用。
