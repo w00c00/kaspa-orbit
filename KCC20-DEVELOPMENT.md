@@ -61,7 +61,9 @@ test beside upstream's pinned test helpers, and removes it after execution.
 Cargo uses `--locked` and may download build dependencies. No wallet RPC or
 transaction broadcast occurs. Four selected groups (28 scenarios) pass locally;
 seven included upstream tests are filtered out. This is script execution, not
-full mempool/consensus validation, and is not yet run by desktop CI.
+full mempool/consensus validation. A separate GitHub Actions workflow runs it.
+The first Linux CI run passed on commit `2d522d6`:
+[KCC20 script engine run 34334349408](https://github.com/w00c00/kaspa-orbit/actions/runs/34334349408).
 
 The TN10 form now defaults to local minimum-fee estimation (1 sompi/mass),
 rebuilding the change output until the fee covers the measured mass, with a
@@ -74,7 +76,7 @@ before key access, and again at submission. Node reports remain a trust boundary
 
 The preparation/authorization/submission components have isolated tests and
 are connected to the TN10 wallet form. Real TN10 end-to-end tests, recovery UX,
-CI engine-test integration and independent review remain outstanding.
+and independent review remain outstanding.
 Do not enable mainnet signing on the strength of these unit tests alone.
 
 ## 中文摘要

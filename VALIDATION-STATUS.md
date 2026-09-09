@@ -1,0 +1,28 @@
+# Verification snapshot / 验证范围
+
+Recorded 2026-09-09. This is a development wallet, not a production-readiness claim.
+以下记录区分离线测试、节点查询与真实资金交易，不能互相替代。
+
+- `169f2b2`: local Node suite has 80 passing tests; isolated Electron smoke passed.
+- `d16a77a`: macOS, Windows and Linux desktop CI passed (run `34334814463`).
+- `2d522d6`: pinned Kaspa script-engine CI passed four selected groups / 28
+  scenarios (run `34334349408`); seven included upstream tests are filtered out.
+- `3e65914` macOS ARM64 DMG: CRC verified and all 49 desktop/UI files matched
+  the commit. SHA-256: `6d6ec69ce3d2c3691d9f4f2cb7a364e4915ec390d6d015c9fad4e6568e461eeb`.
+  This package predates the latest EVM response/parameter fixes.
+- Read-only configured-node probes passed for Igra mainnet (38833), Igra
+  testnet (38836), and Kasplex mainnet (202555): chain ID and block number.
+- Resolver-selected TN10 node reported synced, UTXO index enabled, server
+  2.0.1 and DAA 565873849; the TN10 activation gate accepted this observation.
+
+## Not yet proven / 尚未验证
+
+- Live KCC20 transfer, resulting token change and confirmation/recovery flow.
+- Mainnet KCC20 signing: deliberately disabled pending exact-profile review.
+- Broad third-party dApp compatibility: local provider fixtures do not prove
+  real websites' connection, signing, transaction and recovery flows.
+- Real user installation and live transactions on every supported OS.
+- Independent security review of the exact release candidate.
+
+No real wallet profile, seed or funded signing key was used for these checks.
+No transaction was broadcast by the node probes or script-engine tests.
