@@ -35,3 +35,7 @@ empty disposable profile: page loaded, EIP-6963 discovery returned Orbit,
 This does not prove the website's wallet-selection UI, connection approval,
 signing or transaction behavior. The command makes public website requests,
 never creates a wallet, and removes its temporary profile after Electron exits.
+
+The same public-page probe also passed for `https://app.zealousswap.com/`:
+document ready state `complete`, Orbit discovery present, no accounts exposed.
+No connect button was approved, and no trade was prepared or submitted.
