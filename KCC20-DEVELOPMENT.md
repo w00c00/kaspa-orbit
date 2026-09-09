@@ -47,8 +47,21 @@ A separate local Rust script-engine harness executed the generated single,
 merged and partial (900 transferred, 100 returned) transactions, and rejected
 altered change and missing signatures for all three. The partial transaction
 uses Toccata mass mode and an explicit 200000-sompi synthetic fee. That
-harness is not bundled in this repository or run by its CI; do not conflate
-this local evidence with a reproducible CI consensus validation gate.
+harness is now bundled in `test/engine/orbit_live_token.rs`, with a runner:
+
+```sh
+node scripts/run-kcc20-engine.cjs /path/to/silverscript
+```
+
+The upstream checkout must be at
+`158534d606e9d5541e932c7575ff331e12699fb5` with clean tracked files.
+Install this wallet's npm dependencies first; Rust/Cargo and Node must be on PATH.
+The runner uses the committed public bytecode fixture, temporarily installs its
+test beside upstream's pinned test helpers, and removes it after execution.
+Cargo uses `--locked` and may download build dependencies. No wallet RPC or
+transaction broadcast occurs. Four selected groups (28 scenarios) pass locally;
+seven included upstream tests are filtered out. This is script execution, not
+full mempool/consensus validation, and is not yet run by desktop CI.
 
 The TN10 form now defaults to local minimum-fee estimation (1 sompi/mass),
 rebuilding the change output until the fee covers the measured mass, with a
@@ -61,7 +74,7 @@ before key access, and again at submission. Node reports remain a trust boundary
 
 The preparation/authorization/submission components have isolated tests and
 are connected to the TN10 wallet form. Real TN10 end-to-end tests, recovery UX,
-portable engine-test provenance and independent review remain outstanding.
+CI engine-test integration and independent review remain outstanding.
 Do not enable mainnet signing on the strength of these unit tests alone.
 
 ## 中文摘要
