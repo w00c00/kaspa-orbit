@@ -42,6 +42,8 @@ the workflow file alone is not evidence that those jobs passed.
 - EVM message/typed-data signing and reviewed transaction signing path; EIP-6963 discovery and provider event listeners. Transaction tests currently use mock RPC.
 - EVM 同一 provider 同时提供于 `window.ethereum` 与 `window.kasware.ethereum`，兼容 KasWare 的连接入口。
   Both EVM entry points share the same provider, network, permissions and events.
+- EVM 网站可调用 `wallet_revokePermissions`，参数为 `[{eth_accounts:{}}]`，撤销当前网站的账户授权；不会影响其他域名或 Kaspa 权限。
+  EVM dApps can revoke their own account permission with `wallet_revokePermissions`; other origins and Kaspa permissions are unaffected.
 - Kaspa `signMessage(message, {type, noAuxRand})` 返回 KIP-5 Schnorr 十六进制签名；支持 `auto` / `schnorr` 和布尔值 `noAuxRand`。ECDSA、未知参数明确拒绝，不会静默降级，也不声称兼容旧版 Base64 签名格式。
   Message signing returns KIP-5 Schnorr hex. ECDSA and unknown options are rejected; legacy Base64 formats are not supported.
 - Kaspa 主网默认；可切换 TN10，记住网络选择。切换网络会断开网站授权并清除旧网络显示。
