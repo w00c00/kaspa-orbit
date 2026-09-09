@@ -9,6 +9,24 @@ test('injected provider discovers, reports errors and removes event listeners',a
   assert.equal(await window.ethereum.request({method:'eth_chainId'}),'0x97b4');
   for(const invalid of [null,undefined,[],42])await assert.rejects(window.ethereum.request(invalid),error=>error.code===-32602);
   const originalInvoke=electron.ipcRenderer.invoke;
+  const {BrowserProvider,Wallet,getBytes,verifyMessage}=require('ethers');
+  const wallet=Wallet.createRandom();
+  electron.ipcRenderer.invoke=async(_channel,{family,method,params})=>{
+    assert.equal(family,'evm');
+    if(method==='eth_chainId')return {result:'0x97b4'};
+    if(method==='eth_accounts'||method==='eth_requestAccounts')return {result:[wallet.address]};
+    if(method==='eth_getBalance')return {result:'0x2a'};
+    if(method==='personal_sign'){assert.equal(params[1].toLowerCase(),wallet.address.toLowerCase());return {result:await wallet.signMessage(getBytes(params[0]))};}
+    return {error:{code:4200,message:'Unsupported method'}};
+  };
+  const client=new BrowserProvider(window.ethereum);
+  try{
+    assert.equal((await client.getNetwork()).chainId,38836n);
+    const signer=await client.getSigner();assert.equal(await signer.getAddress(),wallet.address);
+    assert.equal(await client.getBalance(wallet.address),42n);
+    const signature=await signer.signMessage('Orbit compatibility test');
+    assert.equal(verifyMessage('Orbit compatibility test',signature),wallet.address);
+  }finally{client.destroy();electron.ipcRenderer.invoke=originalInvoke;}
   electron.ipcRenderer.invoke=async()=>({error:{code:3,message:'execution reverted',data:'0xdeadbeef'}});
   await assert.rejects(window.ethereum.request({method:'eth_call',params:[]}),error=>error.code===3&&error.data==='0xdeadbeef');
   electron.ipcRenderer.invoke=originalInvoke;
