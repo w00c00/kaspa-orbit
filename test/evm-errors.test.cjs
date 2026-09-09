@@ -1,5 +1,16 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {EvmService}=require('../desktop/evm.cjs');
+test('EVM reads reject late results after network changes at either await boundary',async()=>{
+ for(const phase of ['verify','read']){
+  const service=new EvmService();let release,started;
+  const ready=new Promise(resolve=>{started=resolve;});
+  const pending=new Promise(resolve=>{release=resolve;});let reads=0;
+  service.verify=async()=>{if(phase==='verify'){started();await pending;}};
+  service.rpc=async()=>{reads++;if(phase==='read'){started();await pending;}return 'old-chain-result';};
+  const result=service.read('eth_blockNumber');await ready;service.revision++;release();
+  await assert.rejects(result,/Network changed/);assert.equal(reads,phase==='verify'?0:1);
+ }
+});
 test('EVM RPC preserves revert data for dApp decoding',async()=>{
  for(const data of ['0xdeadbeef',{originalError:{data:'0x1234'}},null]){
   const service=new EvmService(async()=>Response.json({jsonrpc:'2.0',id:1,error:{code:3,message:'execution reverted',data}}));

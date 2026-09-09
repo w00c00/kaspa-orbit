@@ -23,7 +23,13 @@ class EvmService {
   }
   async verify(network=this.network){if(quantity(await this.rpc('eth_chainId',[],network))!==BigInt(network.chainId))throw Error('RPC returned wrong chain / 节点网络不匹配');}
   async switch(chainId){const next=NETWORKS.find(n=>BigInt(n.chainId)===quantity(chainId));if(!next)throw Object.assign(Error('Unknown network'),{code:4902});await this.verify(next);this.network=next;this.revision++;return null;}
-  async read(method,params=[]){if(!READ_METHODS.has(method))throw Object.assign(Error('Unsupported RPC method'),{code:4200});const network=this.network;await this.verify(network);return this.rpc(method,params,network);}
+  async read(method,params=[]){
+    if(!READ_METHODS.has(method))throw Object.assign(Error('Unsupported RPC method'),{code:4200});
+    const network=this.network,revision=this.revision;
+    const current=()=>{if(this.network!==network||this.revision!==revision)throw Error('Network changed during RPC read / 查询期间网络已切换');};
+    await this.verify(network);current();
+    const result=await this.rpc(method,params,network);current();return result;
+  }
   async prepare(input,address){
     if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Invalid transaction');
     const allowed=new Set(['from','to','value','data','gas','gasPrice','maxFeePerGas','maxPriorityFeePerGas','nonce','chainId','type','accessList']);
