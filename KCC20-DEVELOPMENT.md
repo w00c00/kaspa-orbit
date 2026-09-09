@@ -16,6 +16,13 @@ No real wallet, funding or broadcast was used for the recorded tests.
 - `kcc20-sign.cjs`: require exact reviewed transaction bytes and owner key;
   sign with the WASM `SighashType.All` enum, verify the wire flag and unchanged
   transaction fields. No vault access or broadcasting is performed here.
+- `kcc20-prepare.cjs`: choose an ordinary owner funding input and recheck the
+  full unsigned transaction against the selected node.
+- `kcc20-authorize.cjs`: snapshot reviewed data, derive the review summary from
+  validated transaction fields, obtain approval, recheck context/inputs, sign.
+- `kcc20-submit.cjs`: bind the history account to the owner input, require a
+  durable pre-broadcast record/checkpoint, bound node request duration and never
+  automatically retry ambiguous submission outcomes.
 
 Node observation is not a UTXO reservation or consensus verification. Callers
 must recheck context and inputs after approval and before broadcasting.
@@ -43,8 +50,8 @@ this local evidence with a reproducible CI consensus validation gate.
 
 ## Remaining integration gates
 
-Wallet approval UI, automatic ordinary funding selection, final context guards,
-durable pre-broadcast journal, submission/recovery, real TN10 end-to-end tests,
+The preparation/authorization/submission components have isolated tests but are
+not connected to wallet IPC or UI. Real TN10 end-to-end tests, recovery UX,
 portable engine-test provenance and independent review remain outstanding.
 Do not enable mainnet signing on the strength of these unit tests alone.
 
@@ -52,5 +59,6 @@ Do not enable mainnet signing on the strength of these unit tests alone.
 
 这些是开发中的底层组件，尚未接入钱包界面或 dApp API。签名仅允许 TN10，
 测试使用临时无资金密钥和合成交易。节点复核不代表锁定 UTXO，也不代表完整
-共识验证。真实测试网全流程、授权界面、手续费选币、广播恢复和独立审查
+共识验证。选币、审核和广播边界已实现独立组件，但真实测试网全流程、
+授权界面接入、广播恢复体验和独立审查
 尚未完成，不能据此声称主网可用。

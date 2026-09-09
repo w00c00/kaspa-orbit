@@ -28,6 +28,18 @@ test('unsigned KCC20 assembly preserves bindings and balances KAS without signin
  assert.deepEqual(tx.outputs[0].covenant,{authorizingInput:0,covenantId:plan.covenantId});assert.equal(tx.outputs[1].covenant,null);
  assert.equal(tx.inputs.reduce((n,i)=>n+BigInt(i.utxo.amount),0n)-tx.outputs.reduce((n,o)=>n+BigInt(o.value),0n),100000n);assert.ok(BigInt(draft.estimatedMass)<=100000n);assert.equal(draft.readyToSign,false);
 });
+test('automatic KCC20 funding excludes covenant and coinbase outputs and rechecks selected inputs',async()=>{
+ const {prepareAddressTransfer}=require('../desktop/kcc20-prepare.cjs'),f=fixture();
+ const entry=cell=>({outpoint:{transactionId:cell.transactionId,index:cell.index},covenantId:cell.covenantId,amount:BigInt(cell.valueSompi),blockDaaScore:1n,isCoinbase:false,scriptPublicKey:{version:0,script:cell.scriptPublicKey.slice(4)}});
+ const token=entry(f.plan.inputs[0]),funding=entry(f.funding);let calls=0;
+ const service={network:'testnet-10',revision:0,withRpc:fn=>fn({getUtxosByAddresses:async()=>{
+  calls++;return {entries:calls===1?[{...funding,covenantId:f.plan.covenantId},{...funding,isCoinbase:true},funding]:[token,funding]};
+ }})};
+ const prepared=await prepareAddressTransfer(service,f.plan,f.options);
+ assert.equal(calls,2);assert.equal(prepared.funding.covenantId,null);assert.equal(prepared.requiresApproval,true);
+ calls=0;service.withRpc=fn=>fn({getUtxosByAddresses:async()=>({entries:[{...funding,covenantId:f.plan.covenantId}]})});
+ await assert.rejects(prepareAddressTransfer(service,f.plan,f.options),/No suitable/);
+});
 test('input preflight accepts real WASM UTXO references without losing covenant identity',async()=>{
  const {recheckCovenantInputs}=require('../desktop/covenant-preflight.cjs');
  const {restoreBoundTransaction}=require('../desktop/covenant-transaction.cjs');
@@ -76,4 +88,44 @@ test('KCC20 signer binds reviewed bytes, exact owner and ALL signature on TN10',
   assert.throws(()=>signAddressTransfer(f.plan,f.funding,{...f.options,owner:'11'.repeat(32)},draft.transaction,key),/key mismatch/);
   assert.throws(()=>signAddressTransfer({...f.plan,network:'mainnet'},f.funding,f.options,draft.transaction,key),/TN10/);
  }finally{owner.free();publicKey.free();key.free();}
+});
+test('token authorization cancels before signing on rejection or stale context',async()=>{
+ const {authorizeAddressTransfer}=require('../desktop/kcc20-authorize.cjs'),f=fixture();
+ const prepared={...f,draft:assembleAddressTransfer(f.plan,f.funding,f.options),revision:0};let signed=0;
+ const service={network:'testnet-10',revision:0,withRpc:()=>{throw Error('Unexpected node access');}};
+ const vault={locked:false,withKaspaKey:()=>{signed++;}};
+ await assert.rejects(authorizeAddressTransfer({service,prepared,vault,valid:()=>true,approve:async()=>{throw Error('Rejected');}}),/Rejected/);
+ await assert.rejects(authorizeAddressTransfer({service,prepared,vault,valid:()=>true,approve:async()=>{vault.locked=true;}}),/changed/);
+ assert.equal(signed,0);
+});
+test('token approval derives amounts from transaction and snapshots mutable caller data',async()=>{
+ const {authorizeAddressTransfer}=require('../desktop/kcc20-authorize.cjs');
+ const key=new w.PrivateKey(require('node:crypto').randomBytes(32).toString('hex')),pub=key.toPublicKey(),owner=pub.toXOnlyPublicKey();
+ try{
+  const f=fixture(owner.toString()),original=assembleAddressTransfer(f.plan,f.funding,f.options);
+  const prepared={...f,draft:{...original,feeSompi:'1',changeSompi:'999'},revision:0};
+  const raw=JSON.parse(original.transaction),entries=raw.inputs.map(i=>({outpoint:{transactionId:i.transactionId,index:i.index},covenantId:i.utxo.covenantId,amount:BigInt(i.utxo.amount),blockDaaScore:BigInt(i.utxo.blockDaaScore),isCoinbase:false,scriptPublicKey:{version:0,script:i.utxo.scriptPublicKey.slice(4)}}));
+  const service={network:'testnet-10',revision:0,withRpc:fn=>fn({getUtxosByAddresses:async()=>({entries})})};let signed=0;
+  const vault={locked:false,withKaspaKey:fn=>{signed++;return fn(key);}};
+  const result=await authorizeAddressTransfer({service,prepared,vault,valid:()=>true,approve:async summary=>{
+   const review=JSON.parse(summary);assert.equal(review.feeSompi,original.feeSompi);assert.equal(review.kasChangeSompi,original.changeSompi);
+   prepared.plan.outputs[0].owner='ff'.repeat(32);prepared.options.feeSompi='1';
+  }});
+  assert.equal(signed,1);assert.deepEqual(JSON.parse(result.transaction).outputs,raw.outputs);
+ }finally{owner.free();pub.free();key.free();}
+});
+test('token submission journals before sending and never auto-retries uncertainty',async()=>{
+ const {submitAddressTransfer}=require('../desktop/kcc20-submit.cjs'),{signAddressTransfer}=require('../desktop/kcc20-sign.cjs');
+ const key=new w.PrivateKey(require('node:crypto').randomBytes(32).toString('hex')),pub=key.toPublicKey(),owner=pub.toXOnlyPublicKey();
+ try{
+  const f=fixture(owner.toString()),draft=assembleAddressTransfer(f.plan,f.funding,f.options),signed=signAddressTransfer(f.plan,f.funding,f.options,draft.transaction,key);
+  const raw=JSON.parse(signed.transaction),entries=raw.inputs.map(i=>({outpoint:{transactionId:i.transactionId,index:i.index},covenantId:i.utxo.covenantId,amount:BigInt(i.utxo.amount),blockDaaScore:BigInt(i.utxo.blockDaaScore),isCoinbase:false,scriptPublicKey:{version:0,script:i.utxo.scriptPublicKey.slice(4)}}));
+  const events=[];let failStorage=false,failRpc=false;
+  const service={network:'testnet-10',revision:0,history:{before:()=>{events.push('before');if(failStorage)throw Error('Disk full');},after:()=>events.push('after')},withRpc:fn=>fn({getUtxosByAddresses:async()=>({entries}),getSink:async()=>({sink:'ee'.repeat(32)}),submitTransaction:async()=>{events.push('submit');if(failRpc)throw Error('Timeout');return {transactionId:signed.transactionId};}})};
+  const ownerAddress=key.toAddress('testnet-10'),address=ownerAddress.toString();ownerAddress.free();
+  await assert.rejects(submitAddressTransfer({service,signed,address:'wrong-account',valid:()=>true}),/account mismatch/);assert.deepEqual(events,[]);
+  await submitAddressTransfer({service,signed,address,valid:()=>true});assert.deepEqual(events,['before','submit','after']);
+  events.length=0;failStorage=true;await assert.rejects(submitAddressTransfer({service,signed,address,valid:()=>true}),/Disk full/);assert.deepEqual(events,['before']);
+  events.length=0;failStorage=false;failRpc=true;await assert.rejects(submitAddressTransfer({service,signed,address,valid:()=>true}),/status unknown/);assert.deepEqual(events,['before','submit']);
+ }finally{owner.free();pub.free();key.free();}
 });
