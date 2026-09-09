@@ -5,6 +5,9 @@ Cross-platform Kaspa ecosystem desktop wallet and embedded dApp browser. In deve
 
 Repository / 仓库: https://github.com/w00c00/kaspa-orbit
 
+SilverScript v1.0.0 编译兼容性、验证范围及上游版本字段问题：
+[正式版迁移记录 / v1 migration and verification](SILVERSCRIPT-V1.md).
+
 v0.1.0 是开发预览版，不是正式资产钱包。发布草稿仅仓库维护者可见。
 v0.1.0 is a developer preview, not a production wallet. Draft releases are visible only to repository maintainers.
 

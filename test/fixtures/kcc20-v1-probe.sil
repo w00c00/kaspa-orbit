@@ -1,0 +1,75 @@
+// Compatibility compilation probe only; not a deployed or approved token template.
+// v1.0.0 tag still declares COMPILER_VERSION = 0.1.0; pin the Git commit externally.
+pragma silverscript ^0.1.0;
+contract Kcc20(int maxIns, int maxOuts, byte[32] initOwner, byte initIdentifierType, int initAmount, bool initIsMinter) {
+    byte constant IDENTIFIER_PUBKEY = 0x00;
+    byte constant IDENTIFIER_SCRIPT_HASH = 0x01;
+    byte constant IDENTIFIER_COVENANT_ID = 0x02;
+    byte constant IDENTIFIER_ADDRESS = 0x03;
+    // Per-balance upper bound (defense-in-depth): conservation holds total supply, but as a reusable asset
+    // standard the covenant must bound each balance so summing `maxIns` inputs can never overflow int64
+    // (≈9.22e18) and let a wrapped `inSum == outSum` mint supply. 1e9 matches curve_cp/pool MAX_TOKEN.
+    int constant MAX_TOKEN = 1000000000;
+
+    byte[32] ownerIdentifier = initOwner;
+    byte identifierType = initIdentifierType;
+    int amount = initAmount;
+    bool isMinter = initIsMinter;
+
+    entry transfer(State[] newStates, sig[] sigs, byte[] witnesses) {
+        require(newStates.length >= 1 && newStates.length <= maxOuts);
+        byte[32] covid = OpInputCovenantId(this.activeInputIndex);
+
+        int inCount = OpCovInputCount(covid);
+        require(inCount >= 1 && inCount <= maxIns);
+        require(OpCovOutputCount(covid) == newStates.length);
+
+        // authorize every covenant input per its ownership mode, summing input amounts
+        int inSum = 0;
+        for (i, 0, inCount, maxIns) {
+            State previous = readInputState(OpCovInputIdx(covid, i));
+            byte[32] o = previous.ownerIdentifier;
+            byte t = previous.identifierType;
+            int a = previous.amount;
+            if (t == IDENTIFIER_PUBKEY) {
+                require(checkSig(sigs[i], pubkey(o)));
+            } else if (t == IDENTIFIER_SCRIPT_HASH) {
+                require(tx.inputs[unsigned(witnesses[i])].scriptPubKey == byte[](new ScriptPubKeyP2SH(o)));
+            } else if (t == IDENTIFIER_COVENANT_ID) {
+                require(OpInputCovenantId(unsigned(witnesses[i])) == o);
+            } else if (t == IDENTIFIER_ADDRESS) {
+                // presence-based ownership: spendable iff the tx carries a co-present input at the owner's
+                // P2PK address — which an existing wallet (Kasware signPskt) signs externally. The token
+                // UTXO itself needs no in-script signature.
+                require(tx.inputs[unsigned(witnesses[i])].scriptPubKey == byte[](new ScriptPubKeyP2PK(pubkey(o))));
+            } else {
+                require(false);
+            }
+            // Non-negativity guard on inputs (conservation). `amount` is signed, so summing inputs without
+            // this lets a spend pair a +X and a −X input to fake `inSum == outSum` and mint from nothing.
+            // 0 is allowed so a zero-amount minter-branch input still spends.
+            require(a >= 0);
+            inSum = inSum + a;
+        }
+
+        // validate every output's full state and sum output amounts
+        int outSum = 0;
+        for (i, 0, newStates.length, maxOuts) {
+            // A balance must hold >= 1 token, EXCEPT a minter branch — a pure mint-authority capability
+            // that legitimately holds 0 (a curve recreates its 0-amount C-owned minter branch on every buy).
+            require(newStates[i].amount >= 1 || (newStates[i].isMinter && newStates[i].amount == 0));
+            require(newStates[i].amount <= MAX_TOKEN);   // per-balance cap keeps Σ inputs int64-safe
+            outSum = outSum + newStates[i].amount;
+            validateOutputState(OpCovOutputIdx(covid, i), newStates[i]);
+        }
+
+        // ordinary (non-minter) branches must conserve supply and may not create minter branches;
+        // minter branches may grow (mint) or shrink (burn) the total.
+        if (!isMinter) {
+            require(inSum == outSum);
+            for (i, 0, newStates.length, maxOuts) {
+                require(!newStates[i].isMinter);
+            }
+        }
+    }
+}

@@ -1,0 +1,8 @@
+[
+  {"kind":"int","value":4},
+  {"kind":"int","value":5},
+  {"kind":"bytes","value":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},
+  {"kind":"byte","value":3},
+  {"kind":"int","value":1000000},
+  {"kind":"bool","value":false}
+]

@@ -3,6 +3,12 @@
 Recorded 2026-09-09. This is a development wallet, not a production-readiness claim.
 以下记录区分离线测试、节点查询与真实资金交易，不能互相替代。
 
+2026-09-10 update: official SilverScript v1.0.0 compilation probe and pinned
+engine checks passed (28 scenarios), together with 84 Node tests and the isolated
+Electron smoke. Passing an old upstream checkout to the runner was separately
+confirmed to fail before compilation. See [v1 migration](SILVERSCRIPT-V1.md).
+These are local source checks, not updated release assets or live transfers.
+
 - `169f2b2`: local Node suite has 80 passing tests; isolated Electron smoke passed.
 - `d16a77a`: macOS, Windows and Linux desktop CI passed (run `34334814463`).
 - `2d522d6`: pinned Kaspa script-engine CI passed four selected groups / 28
