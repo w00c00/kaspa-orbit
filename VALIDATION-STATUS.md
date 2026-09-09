@@ -27,6 +27,16 @@ Recorded 2026-09-09. This is a development wallet, not a production-readiness cl
 No real wallet profile, seed or funded signing key was used for these checks.
 No transaction was broadcast by the node probes or script-engine tests.
 
+## Desktop permission and signing integration
+
+The isolated Electron smoke now exercises the actual IPC/provider path with an
+ephemeral unfunded wallet: request account permission, query permission, sign a
+fixed personal message, sign a fixed EIP-712 test message, verify both signatures,
+and revoke permission with an empty-account event. Wrong-chain typed data is
+rejected. The test approves only the exact fixture origin and exact test prompts;
+other prompts are rejected. No remote website receives these signatures, and no
+transaction is built or broadcast. Temporary wallet data is removed on exit.
+
 ## Public-page browser probe
 
 `node scripts/run-desktop-smoke.cjs --live https://kascov.io` passed using an
