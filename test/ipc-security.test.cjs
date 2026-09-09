@@ -13,6 +13,22 @@ function harness(){
  vm.runInContext("vault=fakeVault;window={webContents:{send:()=>{}}};tabs={tabs:new Map([['one',{view}]]),active:view,emit:()=>{}};",context);
  return {callEvm:(method,params=[])=>handlers.get('dapp-request')({sender:wc,senderFrame:frame},{family:'evm',method,params}),context,frame,wc,address,events,fakeVault,allow:()=>{response=1;},grant:()=>vm.runInContext("permissions.grant('https://example.test','kaspa')",context),call:(method,params=[],senderFrame=frame)=>handlers.get('dapp-request')({sender:wc,senderFrame},{family:'kaspa',method,params}),counts:()=>({prepared,broadcast,approved})};
 }
+test('wallet rename preserves unlock and dApp permissions, including rejected names',async()=>{
+ const h=harness();h.grant();
+ vm.runInContext(`
+  window.webContents.mainFrame={url:pathToFileURL(shellFile).href};
+  wallets={rename:async name=>{if(name!=='Renamed')throw Error('Invalid name');}};
+  permissions.grant('https://example.test','evm');
+ `,h.context);
+ const call=name=>{h.context.renameName=name;return vm.runInContext("walletUi({sender:window.webContents,senderFrame:window.webContents.mainFrame},'wallet-rename',{name:renameName})",h.context);};
+ const generation=vm.runInContext('generation',h.context);
+ await call('Renamed');await assert.rejects(call(''),/Invalid name/);
+ assert.equal(h.fakeVault.locked,false);
+ assert.equal(vm.runInContext('generation',h.context),generation);
+ assert.equal(vm.runInContext("permissions.has('https://example.test','evm')&&permissions.has('https://example.test','kaspa')",h.context),true);
+ assert.equal(vm.runInContext('walletBusy',h.context),false);
+ vm.runInContext('approvalBusy=true',h.context);await assert.rejects(call('Renamed'),/pending/);
+});
 test('EVM revocation is scoped to requesting origin and works while locked',async()=>{
  const h=harness();h.grant();vm.runInContext("permissions.grant('https://example.test','evm');permissions.grant('https://other.test','evm')",h.context);
  const listed=(await h.callEvm('wallet_getPermissions')).result;assert.equal(listed.length,1);assert.equal(listed[0].invoker,'https://example.test');assert.equal(listed[0].parentCapability,'eth_accounts');assert.equal(listed[0].caveats.length,0);

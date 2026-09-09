@@ -78,14 +78,19 @@ async function walletUi(event,method,args={}){
   if(!trusted(event))throw Error('Unauthorized');
   switch(method){
     case 'status': return {walletId:wallets?.id,wallets:wallets?await wallets.list():[],exists:await vault.exists(),locked:vault.locked,accounts:vault.accounts(kaspaService.network),kaspaNetwork:kaspaService.network,networks:NETWORKS,network:evm.network};
-    case 'wallet-add':case 'wallet-select':case 'wallet-rename':{
+    case 'wallet-rename':{
+      if(walletBusy||networkBusy||transactionBusy||approvalBusy)throw Error('Finish pending requests first / 请先完成待处理请求');
+      walletBusy=true;
+      try{await wallets.rename(args.name);return {phrase:null};}
+      finally{walletBusy=false;}
+    }
+    case 'wallet-add':case 'wallet-select':{
       if(walletBusy||networkBusy||transactionBusy||approvalBusy)throw Error('Finish pending requests first / 请先完成待处理请求');
       walletBusy=true;disconnect();vault.lock();
       try{
         let phrase=null;
         if(method==='wallet-add')phrase=await wallets.add(args.name,args.password,args.phrase);
-        else if(method==='wallet-select')await wallets.select(args.id);
-        else await wallets.rename(args.name);
+        else await wallets.select(args.id);
         vault=wallets.vault;lastActivity=Date.now();return {phrase};
       }finally{vault=wallets.vault;walletBusy=false;changed();window.webContents.send('wallet-state');}
     }
