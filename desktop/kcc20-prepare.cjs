@@ -24,8 +24,24 @@ async function prepareAddressTransfer(service,sourcePlan,sourceOptions){
    }).filter(Boolean).sort((a,b)=>BigInt(a.valueSompi)<BigInt(b.valueSompi)?-1:BigInt(a.valueSompi)>BigInt(b.valueSompi)?1:0);
   },plan.network);current();
   let selected,draft,lastError;
+  const automatic=options.feeSompi===undefined||options.feeSompi==='';
   for(const funding of candidates){
-   try{draft=assembleAddressTransfer(plan,funding,options);selected=funding;break;}
+   try{
+    const attempt={...options,feeSompi:automatic?'1':options.feeSompi};
+    // Rebuild because changing the fee changes the KAS change and storage mass.
+    // This is a local minimum (1 sompi/mass), not a congestion quote.
+    for(let round=0;round<8;round++){
+     try{draft=assembleAddressTransfer(plan,funding,attempt);break;}
+     catch(error){
+      if(!automatic||error.code!=='KCC20_FEE_TOO_LOW')throw error;
+      const minimum=BigInt(error.minimumFeeSompi);
+      if(minimum>100000000n)throw Error('Automatic fee exceeds 1 KAS cap');
+      attempt.feeSompi=String(minimum);
+     }
+    }
+    if(!draft)throw Error('Automatic fee did not converge; enter a manual fee');
+    options.feeSompi=attempt.feeSompi;selected=funding;break;
+   }
    catch(error){lastError=error;}
   }
   if(!selected)throw Error('No suitable ordinary owner funding input: '+(lastError?.message||'no eligible UTXO'));

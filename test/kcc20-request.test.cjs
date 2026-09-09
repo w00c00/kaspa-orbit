@@ -24,6 +24,12 @@ test('request pipeline connects candidate discovery, node verification and ordin
   assert.ok(BigInt(result.prepared.draft.estimatedMass)>100000n);
   assert.equal(result.prepared.options.isToccataActive,true);
   await assert.rejects(prepareTransferRequest({...input,args:{...args,feeSompi:'100000'}}),/Fee below/);
+  for(const feeSompi of ['',undefined]){
+   const automatic=await prepareTransferRequest({...input,args:{...args,feeSompi}});
+   assert.equal(automatic.prepared.options.feeSompi,automatic.prepared.draft.feeSompi);
+   assert.ok(BigInt(automatic.prepared.draft.feeSompi)>=BigInt(automatic.prepared.draft.estimatedMass));
+   assert.ok(BigInt(automatic.prepared.draft.feeSompi)<200000n);
+  }
   source.cells=async()=>{active=false;return {cells:[cell]};};calls=0;await assert.rejects(prepareTransferRequest(input),/context changed/);assert.equal(calls,0);
  }finally{address.free();ownerScript.free();tokenScript.free();}
 });

@@ -36,7 +36,7 @@ function assembleAddressTransfer(plan,funding,{owner,feeSompi,carrierSompi='5000
  raw.inputs[ownerInputIndex].signatureScript='41'+'00'.repeat(65);
  const sized=restoreBoundTransaction(JSON.stringify(raw));let estimatedMass;
  try{if(!w.updateTransactionMass(plan.network,sized,1,isToccataActive===true))throw Error('Token transaction exceeds mass limit');estimatedMass=w.calculateTransactionMass(plan.network,sized,1);raw.storageMass=String(sized.storageMass);}finally{sized.free();}
- if(BigInt(feeSompi)<estimatedMass)throw Error('Fee below estimated transaction mass');
+ if(BigInt(feeSompi)<estimatedMass){const error=Error(`Fee below estimated transaction mass; minimum ${estimatedMass} sompi / 手续费不足，最低 ${estimatedMass} sompi`);error.code='KCC20_FEE_TOO_LOW';error.minimumFeeSompi=String(estimatedMass);throw error;}
  raw.inputs[ownerInputIndex].signatureScript='';const unsigned=restoreBoundTransaction(JSON.stringify(raw));
  try{return Object.freeze({network:plan.network,transaction:unsigned.serializeToSafeJSON(),ownerInputIndex,feeSompi,changeSompi:String(change),estimatedMass:String(estimatedMass),requiresFinalLiveRecheck:true,readyToSign:false});}finally{unsigned.free();}
 }
