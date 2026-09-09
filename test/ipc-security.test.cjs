@@ -11,8 +11,19 @@ function harness(){
  const context=vm.createContext({require:name=>name==='electron'?electron:name==='./kaspa.cjs'?{...localRequire(name),KaspaService:Service}:localRequire(name),__dirname:path.dirname(entry),Buffer,setInterval,clearInterval,console,URL,fetch,AbortSignal,view,fakeVault});
  vm.runInContext(fs.readFileSync(entry,'utf8'),context);
  vm.runInContext("vault=fakeVault;window={webContents:{send:()=>{}}};tabs={tabs:new Map([['one',{view}]]),active:view,emit:()=>{}};",context);
- return {context,frame,wc,address,events,fakeVault,allow:()=>{response=1;},grant:()=>vm.runInContext("permissions.grant('https://example.test','kaspa')",context),call:(method,params=[],senderFrame=frame)=>handlers.get('dapp-request')({sender:wc,senderFrame},{family:'kaspa',method,params}),counts:()=>({prepared,broadcast,approved})};
+ return {callEvm:(method,params=[])=>handlers.get('dapp-request')({sender:wc,senderFrame:frame},{family:'evm',method,params}),context,frame,wc,address,events,fakeVault,allow:()=>{response=1;},grant:()=>vm.runInContext("permissions.grant('https://example.test','kaspa')",context),call:(method,params=[],senderFrame=frame)=>handlers.get('dapp-request')({sender:wc,senderFrame},{family:'kaspa',method,params}),counts:()=>({prepared,broadcast,approved})};
 }
+test('EVM revocation is scoped to requesting origin and works while locked',async()=>{
+ const h=harness();h.grant();vm.runInContext("permissions.grant('https://example.test','evm');permissions.grant('https://other.test','evm')",h.context);
+ for(const params of [[],[{}],[{eth_accounts:null}],[{eth_accounts:{extra:true}}],[{eth_accounts:{},other:{}}]])assert.equal((await h.callEvm('wallet_revokePermissions',params)).error.code,-32602);
+ assert.equal(vm.runInContext("permissions.has('https://example.test','evm')",h.context),true);
+ h.fakeVault.locked=true;
+ assert.equal((await h.callEvm('wallet_revokePermissions',[{eth_accounts:{}}])).result,null);
+ assert.equal(vm.runInContext("permissions.has('https://example.test','evm')",h.context),false);
+ assert.equal(vm.runInContext("permissions.has('https://other.test','evm')",h.context),true);
+ assert.equal(vm.runInContext("permissions.has('https://example.test','kaspa')",h.context),true);
+ assert.equal(h.counts().approved,0);assert.equal(h.events.at(-1)[1].event,'accountsChanged');assert.equal(h.events.at(-1)[1].value.length,0);
+});
 test('real IPC route rejects iframe, locked, unauthorized and cancelled dApp sends',async()=>{
  const h=harness();assert.equal((await h.call('sendKaspa',[h.address,1],{url:h.frame.url})).error.message,'Unauthorized frame');
  h.fakeVault.locked=true;assert.match((await h.call('sendKaspa',[h.address,1])).error.message,/Unlock/);h.fakeVault.locked=false;
