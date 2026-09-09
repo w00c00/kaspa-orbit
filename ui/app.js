@@ -8,7 +8,7 @@ const confirmPassword=document.createElement('input');confirmPassword.id='passwo
 const cancelAdd=document.createElement('button');cancelAdd.type='button';cancelAdd.textContent='取消添加 / Cancel';cancelAdd.hidden=true;$('wallet-form').append(cancelAdd);
 const recoveryForm=document.createElement('form');recoveryForm.innerHTML='<details><summary>重新备份助记词 / Recovery phrase</summary><p>请在私密环境操作，切勿分享给网站或他人。<br>Keep private. Never share with websites or anyone.</p><input id="recovery-password" type="password" minlength="10" required placeholder="验证当前钱包密码 / Current wallet password"><button>验证并显示 / Verify & reveal</button></details>';manager.append(recoveryForm);
 recoveryForm.onsubmit=e=>{e.preventDefault();action(async()=>{const password=$('recovery-password').value;$('recovery-password').value='';const result=await window.nexus.invoke('wallet-recovery',{password});$('phrase').textContent=result.phrase;$('recovery').hidden=false;});};
-function clearSecrets(){$('password').value='';$('password-confirm').value='';$('import').value='';$('phrase').textContent='';$('recovery').hidden=true;}
+function clearSecrets(){$('password').value='';$('password-confirm').value='';$('recovery-password').value='';$('import').value='';$('phrase').textContent='';$('recovery').hidden=true;}
 cancelAdd.onclick=()=>{addingWallet=false;clearSecrets();action(refresh);};
 $('wallet-add').onclick=()=>{addingWallet=true;clearSecrets();$('wallet-name').value='';action(refresh);};
 $('wallet-select').onchange=()=>action(async()=>{addingWallet=false;clearSecrets();await window.nexus.invoke('wallet-select',{id:$('wallet-select').value});await refresh();});

@@ -56,7 +56,10 @@ app.on('browser-window-created',(_event,window)=>{
     document.getElementById('backed-up').click();assert(!document.getElementById('phrase').textContent,'backup phrase cleared');
     for(const id of ['send-form','krc20-load','erc20-form','kcc20-load','history-load'])assert(!!document.getElementById(id),id+' missing');
     assert((await window.nexus.invoke('history')).length===0,'fresh history');assert(Object.keys(await window.nexus.invoke('rpc-settings')).length===0,'default RPC settings');
+    for(const id of ['password','password-confirm','recovery-password','import'])document.getElementById(id).value='synthetic-sensitive-marker';
     await window.nexus.invoke('lock');await refresh();assert(current.locked,'wallet locks');
+    await wait(()=>['password','password-confirm','recovery-password','import'].every(id=>document.getElementById(id).value===''));
+    assert(!document.getElementById('phrase').textContent,'lock clears displayed recovery phrase');
     let rejected=false;try{await window.nexus.invoke('history');}catch{rejected=true;}assert(rejected,'locked history must reject');
     document.getElementById('password').value=password;document.getElementById('wallet-form').requestSubmit();await wait(()=>!current.locked);
     assert(!document.getElementById('phrase').textContent,'unlock must not reveal seed');
@@ -64,7 +67,9 @@ app.on('browser-window-created',(_event,window)=>{
     document.getElementById('wallet-name').value='Second test wallet';document.getElementById('password').value=password;document.getElementById('password-confirm').value=password;document.getElementById('wallet-form').requestSubmit();
     await wait(()=>current.wallets.length===2&&current.walletId!==firstId);
     assert(current.locked,'added wallet starts locked');document.getElementById('backed-up').click();
+    document.getElementById('recovery-password').value='synthetic-old-wallet-password';
     const select=document.getElementById('wallet-select');select.value=firstId;select.dispatchEvent(new Event('change'));await wait(()=>current.walletId===firstId);
+    assert(document.getElementById('recovery-password').value==='','wallet switch clears recovery password');
     document.getElementById('password').value=password;document.getElementById('wallet-form').requestSubmit();await wait(()=>!current.locked);
     assert(current.accounts.kaspa.address===firstAddress,'switch restores original address');
     await window.nexus.invoke('lock');await refresh();return {ok:true};
