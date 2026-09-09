@@ -1,0 +1,7 @@
+# Keep packaged source byte-identical across Linux, macOS and Windows checkouts.
+*.cjs text eol=lf
+*.js text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.svg text eol=lf

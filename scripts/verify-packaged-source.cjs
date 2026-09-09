@@ -25,8 +25,24 @@ function verifyPackagedSource(archive,revision,asar=require('@electron/asar')){
  return {commit,files:files.length};
 }
 if(require.main===module){
- const [archive,revision]=process.argv.slice(2);
+ let [archive,revision]=process.argv.slice(2);
  if(!archive||!revision)throw Error('Usage: node scripts/verify-packaged-source.cjs /path/to/app.asar COMMIT');
+ if(archive==='--dist'){
+  const fs=require('node:fs');
+  const archives=[];
+  function find(dir,depth=0){
+   if(depth>5)return;
+   for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+    const file=path.join(dir,entry.name);
+    if(entry.isFile()&&entry.name==='app.asar')archives.push(file);
+    else if(entry.isDirectory()&&entry.name!=='node_modules'&&entry.name!=='app.asar.unpacked')find(file,depth+1);
+   }
+  }
+  find(path.join(root,'dist'));
+  if(!archives.length)throw Error('No packaged app.asar found in dist');
+  for(const file of archives)console.log('PASS packaged source:',file,verifyPackagedSource(file,revision));
+ }else{
  console.log('PASS packaged source:',verifyPackagedSource(path.resolve(archive),revision));
+ }
 }
 module.exports={verifyPackagedSource};

@@ -33,6 +33,8 @@ jobs:
         run: npm run dist -- --publish never "-c.linux.maintainer=w00c00 <46839097+w00c00@users.noreply.github.com>"
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify packaged source matches this commit
+        run: node scripts/verify-packaged-source.cjs --dist "${{ github.sha }}"
       - uses: actions/upload-artifact@v4
         with:
           name: kaspa-orbit-${{ runner.os }}-${{ runner.arch }}
