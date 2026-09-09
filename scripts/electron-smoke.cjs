@@ -70,6 +70,10 @@ app.on('browser-window-created',(_event,window)=>{
    await dapp.executeJavaScript(`(async()=>{
     const assert=(ok,label)=>{if(!ok)throw Error(label);};
     assert(typeof window.nexus==='undefined'&&typeof require==='undefined','shell/Node access leaked');
+    for(const name of ['camera','microphone','geolocation','notifications']){
+     const permission=await navigator.permissions.query({name});
+     assert(permission.state==='denied','unexpected browser permission: '+name+' '+permission.state);
+    }
     assert(window.kasware.ethereum===window.ethereum,'EVM alias mismatch');
     assert(window.ethereum.isNexus&&window.ethereum.isKasWare,'provider flags missing');
     assert(await window.kasware.ethereum.request({method:'eth_chainId'})==='0x97b1','default Igra chain mismatch');
