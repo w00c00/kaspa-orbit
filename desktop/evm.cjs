@@ -1,4 +1,5 @@
 const {getAddress,getBytes,isHexString,formatEther,Transaction,keccak256}=require('ethers');
+const {boundedText}=require('./bounded-response.cjs');
 const NETWORKS=Object.freeze([
   {id:'igra-testnet',name:'Igra Galleon Testnet',chainId:38836,symbol:'iKAS',rpc:'https://galleon-testnet.igralabs.com:8545',explorer:'https://explorer.galleon-testnet.igralabs.com'},
   {id:'igra',name:'Igra Mainnet',chainId:38833,symbol:'iKAS',rpc:'https://rpc.igralabs.com:8545',explorer:'https://explorer.igralabs.com'},
@@ -12,7 +13,12 @@ class EvmService {
   async rpc(method,params=[],network=this.network){
     const response=await this.transport(this.rpcOverrides?.[network.id]||network.rpc,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal:AbortSignal.timeout(20000),redirect:'error'});
     if(!response.ok)throw Error(`RPC HTTP ${response.status}`);
-    const body=await response.json();if(body.error)throw Object.assign(Error(body.error.message),{code:body.error.code,...(Object.hasOwn(body.error,'data')?{data:body.error.data}:{})});
+    const body=JSON.parse(await boundedText(response));
+    if(!body||typeof body!=='object'||Array.isArray(body)||body.jsonrpc!=='2.0'||body.id!==1||Object.hasOwn(body,'result')===Object.hasOwn(body,'error'))throw Error('Malformed RPC response');
+    if(Object.hasOwn(body,'error')){
+      if(!body.error||!Number.isInteger(body.error.code)||typeof body.error.message!=='string')throw Error('Malformed RPC error');
+      throw Object.assign(Error(body.error.message),{code:body.error.code,...(Object.hasOwn(body.error,'data')?{data:body.error.data}:{})});
+    }
     if(!Object.hasOwn(body,'result'))throw Error('Malformed RPC response');return body.result;
   }
   async verify(network=this.network){if(quantity(await this.rpc('eth_chainId',[],network))!==BigInt(network.chainId))throw Error('RPC returned wrong chain / 节点网络不匹配');}
