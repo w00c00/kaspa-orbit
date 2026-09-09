@@ -8,7 +8,8 @@ async function main(){
  const electron=require('electron');
  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-smoke-'));
  try{
-  const result=spawnSync(electron,[path.join(__dirname,'electron-smoke.cjs'),...process.argv.slice(2)],{
+  const args=process.argv.slice(2),live=args[0]==='--live';
+  const result=spawnSync(electron,[path.join(__dirname,live?'electron-live-readonly.cjs':'electron-smoke.cjs'),...(live?args.slice(1):args)],{
    stdio:'inherit',env:{...process.env,ORBIT_SMOKE_PROFILE:profile},timeout:60000,killSignal:'SIGKILL'
   });
   if(result.error)throw result.error;

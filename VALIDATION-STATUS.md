@@ -26,3 +26,12 @@ Recorded 2026-09-09. This is a development wallet, not a production-readiness cl
 
 No real wallet profile, seed or funded signing key was used for these checks.
 No transaction was broadcast by the node probes or script-engine tests.
+
+## Public-page browser probe
+
+`node scripts/run-desktop-smoke.cjs --live https://kascov.io` passed using an
+empty disposable profile: page loaded, EIP-6963 discovery returned Orbit,
+`eth_accounts` returned no accounts, and shell/Node APIs were absent.
+This does not prove the website's wallet-selection UI, connection approval,
+signing or transaction behavior. The command makes public website requests,
+never creates a wallet, and removes its temporary profile after Electron exits.
