@@ -12,6 +12,22 @@ test('multiple independent wallets preserve legacy bytes, switch locked and pers
  const imported=await store.add('Imported',password,phrase);assert.equal(imported,null);assert.equal((await store.list()).length,3);
  }finally{store?.vault.lock();await fs.rm(root,{recursive:true,force:true});}
 });
+test('failed index writes preserve selected wallet and names while switching fails locked',async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'orbit-wallet-write-')),password=crypto.randomBytes(24).toString('hex');let store;
+ try{
+  store=await new Wallets(root).init();await store.add('First',password);const first=store.id;
+  await store.add('Second',password);const second=store.id,original=store.vault;
+  await original.unlock(password);const disk=await fs.readFile(path.join(store.dir,'index.json'));
+  const save=store.save;store.save=async()=>{throw Error('simulated disk failure');};
+  await assert.rejects(store.rename('Not saved'),/disk failure/);
+  assert.equal(store.names[second],'Second');assert.equal(store.vault.locked,false);
+  await assert.rejects(store.select(first),/disk failure/);
+  assert.equal(store.id,second);assert.equal(store.vault,original);assert.equal(store.vault.locked,true);
+  assert.deepEqual(await fs.readFile(path.join(store.dir,'index.json')),disk);
+  store.save=save;await store.select(first);await store.rename('Saved');
+  const reloaded=await new Wallets(root).init();assert.equal(reloaded.id,first);assert.equal(reloaded.names[first],'Saved');
+ }finally{store?.vault.lock();await fs.rm(root,{recursive:true,force:true});}
+});
 test('lock wins over pending unlock, including concurrent unlock calls',async()=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'orbit-lock-')),password=crypto.randomBytes(24).toString('hex'),v=new Vault(path.join(root,'vault.json'));
  try{await v.create(password);v.lock();const pending=v.unlock(password);v.lock();await assert.rejects(pending);assert.equal(v.locked,true);
