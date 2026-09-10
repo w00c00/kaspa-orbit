@@ -44,6 +44,17 @@ test('add index failure retains recoverable encrypted wallet without switching t
   assert.equal((await store.vault.recovery(password)).split(' ').length,24);assert.equal(store.vault.locked,true);
  }finally{store?.vault.lock();await fs.rm(root,{recursive:true,force:true});}
 });
+test('missing selection recovers existing encrypted wallet without rewriting index',async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'orbit-selection-recovery-')),password=crypto.randomBytes(24).toString('hex');let store;
+ try{
+  store=await new Wallets(root).init();await store.add('Existing',password);const id=store.id,file=path.join(store.dir,'index.json');
+  const original=await fs.readFile(store.file(id));
+  const broken=JSON.stringify({active:'f'.repeat(32),names:{[id]:'Existing'}});await fs.writeFile(file,broken);
+  let again=await new Wallets(root).init();assert.equal(again.id,id);assert.equal(again.vault.locked,true);assert.match(again.warning,/selection unavailable/);assert.equal(await fs.readFile(file,'utf8'),broken);
+  await fs.rm(file);again=await new Wallets(root).init();assert.equal(again.id,id);assert.equal(again.vault.locked,true);await assert.rejects(fs.access(file),{code:'ENOENT'});
+  assert.deepEqual(await fs.readFile(store.file(id)),original);
+ }finally{store?.vault.lock();await fs.rm(root,{recursive:true,force:true});}
+});
 test('lock wins over pending unlock, including concurrent unlock calls',async()=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'orbit-lock-')),password=crypto.randomBytes(24).toString('hex'),v=new Vault(path.join(root,'vault.json'));
  try{await v.create(password);v.lock();const pending=v.unlock(password);v.lock();await assert.rejects(pending);assert.equal(v.locked,true);

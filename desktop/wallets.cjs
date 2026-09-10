@@ -3,7 +3,13 @@ const {Vault}=require('./vault.cjs');
 class Wallets{
  constructor(root){this.root=root;this.dir=path.join(root,'wallets');this.id='legacy';this.vault=new Vault(path.join(root,'vault.json'));this.names={};this.busy=false;}
  file(id){if(id==='legacy')return path.join(this.root,'vault.json');if(!/^[a-f0-9]{32}$/.test(id))throw Error('Invalid wallet ID');return path.join(this.dir,id+'.json');}
- async init(){await fs.mkdir(this.dir,{recursive:true,mode:0o700});try{const m=JSON.parse(await fs.readFile(path.join(this.dir,'index.json'),'utf8'));this.names=m.names||{};if(m.active){const file=this.file(m.active);await fs.access(file);this.id=m.active;this.vault=new Vault(file);}}catch(e){if(e.code!=='ENOENT')throw e;}return this;}
+ async init(){await fs.mkdir(this.dir,{recursive:true,mode:0o700});try{const m=JSON.parse(await fs.readFile(path.join(this.dir,'index.json'),'utf8'));this.names=m.names||{};if(m.active){const file=this.file(m.active);await fs.access(file);this.id=m.active;this.vault=new Vault(file);}}catch(e){if(e.code!=='ENOENT')throw e;}
+  if(!await this.vault.exists()){
+   const existing=(await this.list())[0];
+   if(existing){this.id=existing.id;this.vault=new Vault(this.file(existing.id));this.warning='Previous wallet selection unavailable; an existing wallet was selected locked. Check its name before unlocking. / 原钱包选择记录不可用，已选择一个现有钱包并保持锁定，请核对后解锁。';}
+  }
+  return this;
+ }
  async list(){const ids=(await fs.readdir(this.dir)).filter(n=>/^[a-f0-9]{32}\.json$/.test(n)).map(n=>n.slice(0,-5));if(await new Vault(this.file('legacy')).exists())ids.unshift('legacy');return ids.map((id,i)=>({id,name:typeof this.names[id]==='string'?this.names[id]:(id==='legacy'?'原有钱包 / Original wallet':`Wallet ${i+1}`)}));}
  async save(state={active:this.id,names:this.names}){const temp=path.join(this.dir,crypto.randomBytes(16).toString('hex')+'.tmp');try{await fs.writeFile(temp,JSON.stringify(state),{mode:0o600,flag:'wx'});await fs.rename(temp,path.join(this.dir,'index.json'));}finally{await fs.rm(temp,{force:true});}}
  name(name){if(typeof name!=='string'||!name.trim()||name.trim().length>50)throw Error('Wallet name requires 1–50 characters / 钱包名称需 1–50 字');return name.trim();}

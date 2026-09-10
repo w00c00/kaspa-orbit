@@ -4,6 +4,7 @@ const manager=document.createElement('section');
 manager.innerHTML='<h2>钱包管理 / Wallets</h2><select id="wallet-select" aria-label="选择钱包 / Select wallet"></select><button id="wallet-add" class="secondary">＋ 新建或导入 / Add wallet</button><form id="wallet-rename-form"><input id="wallet-label" maxlength="50" required placeholder="钱包名称 / Wallet name"><button>重命名 / Rename</button></form>';
 $('onboarding').before(manager);
 const buildLabel=document.createElement('p');buildLabel.id='build-info';manager.prepend(buildLabel);
+const storageWarning=document.createElement('p');storageWarning.setAttribute('role','alert');storageWarning.hidden=true;manager.prepend(storageWarning);
 const walletName=document.createElement('input');walletName.id='wallet-name';walletName.maxLength=50;walletName.placeholder='新钱包名称 / New wallet name';$('wallet-form').prepend(walletName);
 const confirmPassword=document.createElement('input');confirmPassword.id='password-confirm';confirmPassword.type='password';confirmPassword.placeholder='再次输入密码 / Confirm password';$('password').after(confirmPassword);
 const cancelAdd=document.createElement('button');cancelAdd.type='button';cancelAdd.textContent='取消添加 / Cancel';cancelAdd.hidden=true;$('wallet-form').append(cancelAdd);
@@ -25,6 +26,7 @@ $('browser-form').onsubmit=e=>{e.preventDefault();action(()=>window.nexus.invoke
 const originalRefresh=refresh;
 let displayedContext='';
 function syncNetworkContext(){
+ storageWarning.textContent=current.storageWarning||'';storageWarning.hidden=!current.storageWarning;
  if(current.build){buildLabel.textContent=`v${current.build.version} · ${current.build.label}`;buildLabel.title=current.build.revision||'本地开发构建 / Local development build';}
  const context=JSON.stringify([current.kaspaNetwork,current.network.id,current.locked,current.accounts?.kaspa.address]);
  if(displayedContext!==context){
