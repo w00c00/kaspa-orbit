@@ -28,6 +28,22 @@ test('failed index writes preserve selected wallet and names while switching fai
   const reloaded=await new Wallets(root).init();assert.equal(reloaded.id,first);assert.equal(reloaded.names[first],'Saved');
  }finally{store?.vault.lock();await fs.rm(root,{recursive:true,force:true});}
 });
+test('add index failure retains recoverable encrypted wallet without switching the previous wallet',async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'orbit-add-failure-')),password=crypto.randomBytes(24).toString('hex');let store;
+ try{
+  store=await new Wallets(root).init();await store.add('Original',password);const original=store.id,originalVault=store.vault;
+  const disk=await fs.readFile(path.join(store.dir,'index.json')),save=store.save;
+  store.save=async()=>{throw Error('simulated index write failure');};
+  await assert.rejects(store.add('New',password),/Wallet file saved/);
+  assert.equal(store.id,original);assert.equal(store.vault,originalVault);assert.equal(store.vault.locked,true);
+  assert.deepEqual(await fs.readFile(path.join(store.dir,'index.json')),disk);
+  const entries=await store.list();assert.equal(entries.length,2);const added=entries.find(item=>item.id!==original);
+  assert.equal(store.names[added.id],undefined);
+  const restarted=await new Wallets(root).init();assert.equal(restarted.id,original);assert.equal((await restarted.list()).length,2);
+  store.save=save;await store.select(added.id);
+  assert.equal((await store.vault.recovery(password)).split(' ').length,24);assert.equal(store.vault.locked,true);
+ }finally{store?.vault.lock();await fs.rm(root,{recursive:true,force:true});}
+});
 test('lock wins over pending unlock, including concurrent unlock calls',async()=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'orbit-lock-')),password=crypto.randomBytes(24).toString('hex'),v=new Vault(path.join(root,'vault.json'));
  try{await v.create(password);v.lock();const pending=v.unlock(password);v.lock();await assert.rejects(pending);assert.equal(v.locked,true);

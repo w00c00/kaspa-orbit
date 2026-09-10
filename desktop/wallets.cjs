@@ -8,7 +8,14 @@ class Wallets{
  async save(state={active:this.id,names:this.names}){const temp=path.join(this.dir,crypto.randomBytes(16).toString('hex')+'.tmp');try{await fs.writeFile(temp,JSON.stringify(state),{mode:0o600,flag:'wx'});await fs.rename(temp,path.join(this.dir,'index.json'));}finally{await fs.rm(temp,{force:true});}}
  name(name){if(typeof name!=='string'||!name.trim()||name.trim().length>50)throw Error('Wallet name requires 1–50 characters / 钱包名称需 1–50 字');return name.trim();}
  async select(id){if(!(await this.list()).some(w=>w.id===id))throw Error('Wallet not found');this.vault.lock();const next=new Vault(this.file(id));await this.save({active:id,names:this.names});this.id=id;this.vault=next;}
- async add(name,password,phrase){name=this.name(name);const id=crypto.randomBytes(16).toString('hex'),next=new Vault(this.file(id));const recovery=await next.create(password,phrase);next.lock();this.vault.lock();this.id=id;this.vault=next;this.names[id]=name;await this.save();return recovery;}
+ async add(name,password,phrase){
+  name=this.name(name);const id=crypto.randomBytes(16).toString('hex'),next=new Vault(this.file(id));
+  const recovery=await next.create(password,phrase);next.lock();this.vault.lock();
+  const names={...this.names,[id]:name};
+  try{await this.save({active:id,names});}
+  catch{throw Error('Wallet file saved, but wallet index could not be saved. Current wallet unchanged. After fixing storage, select the new wallet from the list and back up with its password. / 钱包文件已保存，但索引保存失败，当前钱包未切换。修复存储问题后，从列表选择新钱包，用创建密码重新备份。');}
+  this.id=id;this.vault=next;this.names=names;return recovery;
+ }
  async rename(name){const names={...this.names,[this.id]:this.name(name)};await this.save({active:this.id,names});this.names=names;}
 }
 module.exports={Wallets};
