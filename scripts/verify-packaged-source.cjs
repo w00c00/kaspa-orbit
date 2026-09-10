@@ -7,8 +7,14 @@ function git(args){
  if(result.status!==0)throw Error(result.stderr.toString()||'Git failed');
  return result.stdout;
 }
-function verifyPackagedSource(archive,revision,asar=require('@electron/asar')){
+function verifyMetadata(metadata,expected,commit,requireRevision=false){
+ for(const field of ['name','version','main'])if(metadata[field]!==expected[field])throw Error('Packaged metadata mismatch: '+field);
+ require('node:assert/strict').deepEqual(metadata.dependencies,expected.dependencies,'Packaged dependency declarations differ');
+ if((requireRevision||metadata.buildRevision!==undefined)&&metadata.buildRevision!==commit)throw Error('Packaged build revision does not match source commit');
+}
+function verifyPackagedSource(archive,revision,asar=require('@electron/asar'),requireRevision=false){
  const commit=git(['rev-parse','--verify',revision+'^{commit}']).toString().trim();
+ verifyMetadata(JSON.parse(asar.extractFile(archive,'package.json').toString()),JSON.parse(git(['show',commit+':package.json']).toString()),commit,requireRevision);
  const files=git(['ls-tree','-r','--name-only',commit,'--','desktop','ui']).toString().trim().split('\n').filter(Boolean);
  if(!files.length)throw Error('Revision has no desktop/UI source');
  const expected=new Set(files);
@@ -40,9 +46,9 @@ if(require.main===module){
   }
   find(path.join(root,'dist'));
   if(!archives.length)throw Error('No packaged app.asar found in dist');
-  for(const file of archives)console.log('PASS packaged source:',file,verifyPackagedSource(file,revision));
+  for(const file of archives)console.log('PASS packaged source:',file,verifyPackagedSource(file,revision,undefined,true));
  }else{
  console.log('PASS packaged source:',verifyPackagedSource(path.resolve(archive),revision));
  }
 }
-module.exports={verifyPackagedSource};
+module.exports={verifyPackagedSource,verifyMetadata};
