@@ -47,6 +47,13 @@ No transaction was broadcast by the node probes or script-engine tests.
 
 ## Desktop permission and signing integration
 
+The isolated desktop smoke also forcibly terminates its test dApp renderer after
+locking the ephemeral wallet. It verifies that the shell displays reload guidance,
+reloads the page, and checks that both injected providers return no locked accounts.
+This exercises a real renderer exit, not only a mocked event. Pending-request
+invalidation on exit is covered by the tab unit test; the crash test does not
+claim to exercise a transaction concurrently awaiting approval.
+
 The actual Electron Kaspa provider path also passes an isolated lifecycle:
 address approval, public-key lookup, bilingual KIP-5 message signing, WASM
 verification and altered-message rejection, account-cleared disconnect event,

@@ -171,6 +171,22 @@ app.on('browser-window-created',(_event,window)=>{
     if(transactionApprovals!==1||submittedTransaction?.hash!==connection.transactionHash||submittedTransaction.from!==expectedAccount||submittedTransaction.to!==expectedAccount||submittedTransaction.value!==1n||submittedTransaction.chainId!==38833n)throw Error('Mock-RPC desktop transaction mismatch');
    }finally{dialog.showMessageBox=originalDialog;await window.webContents.executeJavaScript("window.nexus.invoke('lock')");}
    phase('EVM connect/sign/verify/revoke lifecycle verified');
+   const exited=new Promise(resolve=>dapp.once('render-process-gone',resolve));
+   dapp.forcefullyCrashRenderer();await exited;
+   await window.webContents.executeJavaScript(`(async()=>{
+    for(let i=0;i<100;i++){
+     if([...document.querySelectorAll('#tabs button')].some(button=>button.title.includes('Page process exited; reload')))return;
+     await new Promise(resolve=>setTimeout(resolve,25));
+    }
+    throw Error('Renderer exit guidance missing from wallet UI');
+   })()`);
+   const reloaded=new Promise(resolve=>dapp.once('did-finish-load',resolve));
+   dapp.reload();await reloaded;
+   await dapp.executeJavaScript(`(async()=>{
+    if(!window.kasware||!window.ethereum)throw Error('Provider missing after crash reload');
+    if((await kasware.getAccounts()).length||(await ethereum.request({method:'eth_accounts'})).length)throw Error('Locked account leaked after crash reload');
+   })()`);
+   phase('Real isolated renderer crash and reload verified');
    finish();
   }catch(error){finish(error);}
  });
