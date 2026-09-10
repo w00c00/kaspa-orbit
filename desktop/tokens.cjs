@@ -13,7 +13,9 @@ async function krc20Holdings(network,address,next='',transport=fetch){
  addressFor(address,network);
  if(typeof next!=='string'||next.length>2048)throw Error('Invalid pagination cursor');
  const base=network==='mainnet'?'https://api.kasplex.org':'https://tn10api.kasplex.org';
- const url=new URL(`/v1/krc20/address/${encodeURIComponent(address)}/tokenlist`,base);if(next)url.searchParams.set('next',next);
+ // addressFor has validated the address. Kasplex expects the literal prefix
+ // colon in this path; percent-encoding it returns HTTP 403 "address invalid".
+ const url=new URL(`/v1/krc20/address/${address}/tokenlist`,base);if(next)url.searchParams.set('next',next);
  const response=await transport(url,{signal:AbortSignal.timeout(20000),redirect:'error'});if(!response.ok)throw Error(`KRC20 indexer HTTP ${response.status}`);
  const body=await response.json();if(!Array.isArray(body.result))throw Error('Invalid KRC20 indexer response');
  const tokens=body.result.map(item=>{

@@ -6,6 +6,9 @@ app.setPath('userData',profile);app.setPath('sessionData',profile);
 let submittedTransaction;
 // No fallback to the network: all main-process fetch calls are intercepted.
 globalThis.fetch=async(url,options)=>{
+ const endpoint=new URL(String(url));
+ if(endpoint.hostname==='api.kasplex.org'&&endpoint.pathname.endsWith('/tokenlist'))return Response.json({result:[{tick:endpoint.searchParams.has('next')?'SECOND':'FIRST',dec:'8',balance:'100000000',locked:'0'}],next:endpoint.searchParams.has('next')?'':'page-2'});
+ if(endpoint.hostname==='kascov.io'&&endpoint.pathname.includes('/addr/'))return Response.json({network:'mainnet',address:decodeURIComponent(endpoint.pathname.split('/addr/')[1].slice(0,-5)),token_holdings:[]});
  if(String(url)!=='https://rpc.igralabs.com:8545')throw Error('Unexpected test fetch destination');
  const request=JSON.parse(options.body),{method,params}=request;
  const results={eth_chainId:'0x97b1',eth_getTransactionCount:'0x0',eth_gasPrice:'0x1',eth_estimateGas:'0x5208',eth_getBalance:'0xde0b6b3a7640000'};
@@ -17,6 +20,10 @@ globalThis.fetch=async(url,options)=>{
  return Response.json({jsonrpc:'2.0',id:request.id,result});
 };
 const password=crypto.randomBytes(24).toString('hex');
+// Automatic native-balance discovery must remain entirely offline in smoke.
+require('../desktop/kaspa.cjs').KaspaService.prototype.withRpc=async function(action){
+ return action({getBalanceByAddress:async()=>({balance:123000000n})});
+};
 const phase=label=>console.log('SMOKE phase: '+label);
 phase('temporary profile configured');
 let done=false;
@@ -50,6 +57,26 @@ app.on('browser-window-created',(_event,window)=>{
     document.getElementById('password').value=password;document.getElementById('wallet-form').requestSubmit();await wait(()=>!current.locked);
     assert(document.getElementById('accounts').checkVisibility(),'accounts visible after creation');
     assert(current.accounts.kaspa.address.startsWith('kaspa:'),'mainnet address');
+    await wait(()=>document.getElementById('kaspa-balance').textContent==='1.23000000 KAS');
+    await wait(()=>document.getElementById('krc20-list').textContent.includes('SECOND'));
+    assert(document.getElementById('krc20-list').textContent.includes('FIRST'),'automatic asset discovery includes all pages');
+    await wait(()=>document.getElementById('kcc20-list').textContent.includes('No KCC20 holdings'));
+    assert(document.getElementById('kaspa-address').checkVisibility(),'L1 address visible');
+    assert(!document.getElementById('evm-address').checkVisibility(),'EVM address hidden on L1');
+    document.querySelector('[data-asset="kcc20"]').click();
+    assert(document.getElementById('kcc20-load').checkVisibility(),'KCC20 asset tab');
+    assert(!document.getElementById('kcc20-send-form').checkVisibility(),'mainnet experimental form hidden');
+    const family=document.getElementById('wallet-family');family.value='evm';family.dispatchEvent(new Event('change'));
+    assert(document.getElementById('evm-address').checkVisibility(),'EVM address visible');
+    assert(!document.getElementById('kaspa-address').checkVisibility(),'L1 address hidden on EVM');
+    assert(document.getElementById('send-family').value==='evm','send follows ecosystem');
+    await wait(()=>document.getElementById('balance').textContent==='1.0 iKAS');
+    assert(!document.querySelector('[data-asset="krc20"]').checkVisibility(),'KRC20 unavailable in EVM');
+    document.querySelector('[data-asset="erc20"]').click();assert(document.getElementById('erc20-form').checkVisibility(),'ERC20 tab');
+    document.querySelector('[data-page="activity"]').click();assert(document.getElementById('history-load').checkVisibility(),'activity navigation');
+    document.querySelector('[data-page="settings"]').click();assert(document.getElementById('sites-refresh').checkVisibility(),'site settings navigation');
+    document.querySelector('[data-page="assets"]').click();family.value='kaspa';family.dispatchEvent(new Event('change'));
+    assert(document.getElementById('send-family').value==='kaspa','L1 send restored');
     assert(!!document.getElementById('kcc20-send-form'),'experimental KCC20 form missing');
     let mainnetBlocked=false;try{await window.nexus.invoke('kcc20-send',{});}catch(error){mainnetBlocked=/TN10/.test(error.message);}assert(mainnetBlocked,'experimental token send must reject mainnet before RPC');
     const firstId=current.walletId,firstAddress=current.accounts.kaspa.address;
@@ -63,6 +90,8 @@ app.on('browser-window-created',(_event,window)=>{
     let rejected=false;try{await window.nexus.invoke('history');}catch{rejected=true;}assert(rejected,'locked history must reject');
     document.getElementById('password').value=password;document.getElementById('wallet-form').requestSubmit();await wait(()=>!current.locked);
     assert(!document.getElementById('phrase').textContent,'unlock must not reveal seed');
+    document.querySelector('.wallet-management').open=true;
+    assert(document.getElementById('wallet-add').checkVisibility(),'add wallet accessible from manager');
     document.getElementById('wallet-add').click();await wait(()=>!document.getElementById('wallet-name').hidden);
     document.getElementById('wallet-name').value='Second test wallet';document.getElementById('password').value=password;document.getElementById('password-confirm').value=password;document.getElementById('wallet-form').requestSubmit();
     await wait(()=>current.wallets.length===2&&current.walletId!==firstId);
@@ -75,6 +104,17 @@ app.on('browser-window-created',(_event,window)=>{
     await window.nexus.invoke('lock');await refresh();return {ok:true};
    })()`);
    if(!result.ok)throw Error('Unexpected desktop test result');
+   if(process.env.ORBIT_SMOKE_SCREENSHOTS){
+    const fs=require('node:fs'),path=require('node:path');
+    const directory=path.resolve(process.env.ORBIT_SMOKE_SCREENSHOTS);fs.mkdirSync(directory,{recursive:true});
+    await window.webContents.executeJavaScript(`(async()=>{await window.nexus.invoke('unlock',{password:${JSON.stringify(password)}});await refresh();})()`);
+    for(const [name,script] of [['kaspa-assets',"document.querySelector('[data-asset=\"krc20\"]').click()"],['evm-assets',"document.getElementById('wallet-family').value='evm';document.getElementById('wallet-family').dispatchEvent(new Event('change'));document.querySelector('[data-asset=\"erc20\"]').click()"]]){
+     await window.webContents.executeJavaScript(script+";document.querySelector('.wallet-management').open=false;document.querySelector('aside').scrollTop=0");
+     await new Promise(resolve=>setTimeout(resolve,150));
+     fs.writeFileSync(path.join(directory,name+'.png'),(await window.webContents.capturePage()).toPNG());
+    }
+    await window.webContents.executeJavaScript("(async()=>{await window.nexus.invoke('lock');await refresh();})()");
+   }
    phase('wallet lifecycle verified');
    // Controlled HTTPS fixture, served entirely in-process; no real website or node.
    session.fromPartition('persist:dapps').protocol.handle('https',request=>{

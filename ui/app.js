@@ -31,6 +31,7 @@ function syncNetworkContext(){
  const context=JSON.stringify([current.kaspaNetwork,current.network.id,current.locked,current.accounts?.kaspa.address]);
  if(displayedContext!==context){
   displayedContext=context;
+  $('send-form')?.reset();$('erc20-form')?.reset();
   for(const id of ['krc20-list','kcc20-list','erc20-result','krc-send-panel','krc-recover-list','transfer-result','history-list'])$(id)?.replaceChildren();
   for(const id of ['balance','kaspa-balance'])if($(id))$(id).textContent='—';
   if($('krc20-next'))$('krc20-next').hidden=true;

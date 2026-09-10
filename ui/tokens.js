@@ -3,7 +3,18 @@ tokenSection.innerHTML='<h2>代币 / Tokens</h2><p>KRC20 · Kasplex 索引器 / 
 document.getElementById('accounts').append(tokenSection);
 let krcCursor='';
 function tokenRow(token){const row=document.createElement('p');row.textContent=`${token.symbol}: ${token.balance}${token.lockedBalance?' · 锁定 / Locked: '+token.lockedBalance:''}`;if(token.kind==='krc20'){const button=document.createElement('button');button.textContent='发送 / Send';button.onclick=()=>showKrcTransfer(token);row.append(button);}return row;}
-async function loadKrc(next=''){const generationNetwork=current.kaspaNetwork;const result=await window.nexus.invoke('krc20-holdings',{next});await refresh();if(current.kaspaNetwork!==generationNetwork)throw Error('网络已切换 / Network changed');if(!next)$('krc20-list').replaceChildren();for(const token of result.tokens)$('krc20-list').append(tokenRow(token));if(!result.tokens.length&&!next)$('krc20-list').textContent='没有持仓 / No holdings';krcCursor=result.next;$('krc20-next').hidden=!krcCursor;}
+async function loadKrc(next=''){
+ const context=displayedContext,seen=new Set(),tokens=[];
+ do{
+  if(seen.has(next)||seen.size>=100)throw Error('KRC20 分页异常，未完成查询 / Pagination incomplete');
+  seen.add(next);const result=await window.nexus.invoke('krc20-holdings',{next});
+  if(context!==displayedContext)throw Error('钱包或网络已切换 / Wallet or network changed');
+  tokens.push(...result.tokens);next=result.next;
+ }while(next);
+ $('krc20-list').replaceChildren(...tokens.map(tokenRow));
+ if(!tokens.length)$('krc20-list').textContent='没有持仓 / No holdings';
+ krcCursor='';$('krc20-next').hidden=true;
+}
 $('krc20-load').onclick=()=>action(()=>loadKrc());$('krc20-next').onclick=()=>action(()=>loadKrc(krcCursor));
 $('erc20-form').onsubmit=e=>{e.preventDefault();action(async()=>{const token=await window.nexus.invoke('erc20-holding',{contract:$('erc20-contract').value.trim()});$('erc20-result').replaceChildren(tokenRow(token));
  const form=document.createElement('form');const recipient=document.createElement('input');recipient.required=true;recipient.placeholder='接收地址 / Recipient';const amount=document.createElement('input');amount.required=true;amount.inputMode='decimal';amount.placeholder='代币数量 / Token amount';const submit=document.createElement('button');submit.textContent='审核代币转账 / Review token transfer';const status=document.createElement('p');form.append(recipient,amount,submit,status);$('erc20-result').append(form);
