@@ -16,6 +16,11 @@ class BrowserTabs{
    const update=values=>{const tab=this.tabs.get(id);if(tab){Object.assign(tab,values);this.notify();}};
    view.webContents.on('did-start-loading',()=>update({loading:true,error:null}));
    view.webContents.on('did-stop-loading',()=>update({loading:false}));
+   view.webContents.on('render-process-gone',(_event,details)=>{
+    if(!this.tabs.has(id))return;
+    this.onNavigate();
+    update({loading:false,error:`页面进程已退出，请重新加载 / Page process exited; reload (${details.reason})`});
+   });
    view.webContents.on('did-fail-load',(_event,code,description,_url,main)=>{if(main&&code!==-3)update({loading:false,error:`${description} (${code})`});});
    view.webContents.on('before-input-event',()=>this.onInput?.());
    view.webContents.on('did-start-navigation',(_event,_url,_inPlace,main)=>{if(main)this.onNavigate();});

@@ -9,6 +9,13 @@ test('loading and failures stay per-tab and ignore subframes and cancelled loads
  wc.emit('did-start-loading');assert.equal(tabs.state()[0].error,null);wc.emit('did-stop-loading');assert.equal(tabs.state()[0].loading,false);
  tabs.close(1);assert.doesNotThrow(()=>wc.emit('did-stop-loading'));
 });
+test('renderer exit invalidates pending requests and exposes reload guidance',async()=>{
+ const {tabs,views}=setup();await tabs.open('https://one.example');let invalidated=0;tabs.onNavigate=()=>invalidated++;
+ const wc=views[0].webContents;wc.emit('did-start-loading');wc.emit('render-process-gone',{}, {reason:'crashed'});
+ assert.equal(invalidated,1);assert.equal(tabs.state()[0].loading,false);assert.match(tabs.state()[0].error,/reload.*crashed/);
+ wc.emit('did-start-loading');assert.equal(tabs.state()[0].error,null);
+ tabs.close(1);const before=invalidated;wc.emit('render-process-gone',{}, {reason:'clean-exit'});assert.equal(invalidated,before);
+});
 test('tabs retain pages, select and close independent web contents',async()=>{const {tabs,views}=setup();await tabs.open('https://one.example',true);await tabs.open('https://two.example',true);assert.equal(views[0].visible,false);assert.equal(views[1].visible,true);tabs.select(1);assert.equal(tabs.active,views[0]);assert.equal(views[0].webContents.url,'https://one.example');tabs.close(1);assert.equal(views[0].webContents.closed,true);assert.equal(tabs.active,views[1]);await assert.rejects(tabs.open('file:///etc/passwd'));});
 test('account events never leak to an unauthorized tab',async()=>{const {tabs,views}=setup();await tabs.open('https://one.example',true);await tabs.open('https://two.example',true);const permissions=new Permissions();permissions.grant('https://one.example','evm');tabs.emit('evm','accountsChanged',['0x123'],permissions);assert.equal(views[0].webContents.sent.length,1);assert.equal(views[1].webContents.sent.length,0);permissions.revoke('https://one.example','evm');assert.equal(permissions.list().length,0);tabs.emit('evm','accountsChanged',[],permissions);assert.equal(views[1].webContents.sent.length,1);});
 test('top-level navigation invalidates requests and permissions do not follow a redirect',async()=>{
