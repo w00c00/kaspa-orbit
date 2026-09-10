@@ -77,7 +77,7 @@ app.whenReady().then(async()=>{
 async function walletUi(event,method,args={}){
   if(!trusted(event))throw Error('Unauthorized');
   switch(method){
-    case 'status': return {walletId:wallets?.id,wallets:wallets?await wallets.list():[],exists:await vault.exists(),locked:vault.locked,accounts:vault.accounts(kaspaService.network),kaspaNetwork:kaspaService.network,networks:NETWORKS,network:evm.network};
+    case 'status': return {build:require('./build-info.cjs').buildInfo(),walletId:wallets?.id,wallets:wallets?await wallets.list():[],exists:await vault.exists(),locked:vault.locked,accounts:vault.accounts(kaspaService.network),kaspaNetwork:kaspaService.network,networks:NETWORKS,network:evm.network};
     case 'wallet-rename':{
       if(walletBusy||networkBusy||transactionBusy||approvalBusy)throw Error('Finish pending requests first / 请先完成待处理请求');
       walletBusy=true;
