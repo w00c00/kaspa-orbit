@@ -3,6 +3,29 @@
 Recorded 2026-09-09. This is a development wallet, not a production-readiness claim.
 以下记录区分离线测试、节点查询与真实资金交易，不能互相替代。
 
+## 2026-09-11 integration update
+
+- Commit `bb91d84`: desktop CI run `34474859792` passed on Windows x64,
+  macOS ARM64 and Linux x64. Each ran 95 Node tests, isolated desktop smoke,
+  packaging and comparison of all 52 packaged desktop/UI files with the commit.
+- The smoke now covers automatic two-page KRC20 discovery, KCC20 empty-state
+  discovery and distinct native L1/EVM balances using intercepted transports.
+  It does not prove funded-wallet balances or real token transfers.
+- Live mainnet queries with an ephemeral empty address succeeded for both
+  Kasplex and kascov. Kasplex rejected a percent-encoded address-prefix colon
+  with HTTP 403 / `address invalid`; the validated literal-address path returned
+  HTTP 200. The regression is covered in `test/tokens.test.cjs`.
+- Public-page probes on `https://kaspa.com/` and `https://defi.kaspa.com/swap`
+  passed: complete document, EIP-6963 Orbit discovery, empty accounts and no
+  privileged shell API. The DeFi page displayed a Connect Wallet control.
+- Clicking that observed DeFi control did **not** establish that Orbit appears
+  in its wallet picker: the captured body text contained no wallet list. This
+  remains unverified (a shadow-root modal or page overlay requires inspection).
+  One resource TLS handshake error was also observed; full page health is not
+  established. No wallet connection, signature or transaction was approved.
+
+三平台打包和自动查询流程已验证；KaspaCom 的实际钱包选择、授权、签名和交易仍未验证。
+
 2026-09-10 update: official SilverScript v1.0.0 compilation probe and pinned
 engine checks passed (28 scenarios), together with 84 Node tests and the isolated
 Electron smoke. Passing an old upstream checkout to the runner was separately

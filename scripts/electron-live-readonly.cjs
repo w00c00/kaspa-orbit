@@ -29,7 +29,7 @@ app.on('browser-window-created',(_event,window)=>{
    })()`);
    console.log('PASS public page/provider smoke (not connection or transaction validation): '+JSON.stringify(result));
    if(process.argv.includes('--wallet-picker')){
-    if(new URL(page.getURL()).hostname!=='app.zealousswap.com')throw Error('Wallet picker probe is scoped to Zealous Swap');
+    if(!['app.zealousswap.com','defi.kaspa.com'].includes(new URL(page.getURL()).hostname))throw Error('Wallet picker probe is scoped to verified public dApps');
     const picker=await page.executeJavaScript(`(async()=>{
      const button=[...document.querySelectorAll('button')].find(b=>b.checkVisibility()&&['连接','Connect','Connect Wallet'].includes(b.innerText.trim()));
      if(!button)throw Error('Observed connect control missing');button.click();
