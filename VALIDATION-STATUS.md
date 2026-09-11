@@ -18,13 +18,15 @@ Recorded 2026-09-09. This is a development wallet, not a production-readiness cl
 - Public-page probes on `https://kaspa.com/` and `https://defi.kaspa.com/swap`
   passed: complete document, EIP-6963 Orbit discovery, empty accounts and no
   privileged shell API. The DeFi page displayed a Connect Wallet control.
-- Clicking that observed DeFi control did **not** establish that Orbit appears
-  in its wallet picker: the captured body text contained no wallet list. This
-  remains unverified (a shadow-root modal or page overlay requires inspection).
-  One resource TLS handshake error was also observed; full page health is not
-  established. No wallet connection, signature or transaction was approved.
+- The first body-text-only probe missed the DeFi wallet picker. The follow-up
+  inspected open shadow roots and found `ONBOARD-V2`: its "Available Wallets (4)"
+  list explicitly included **Kaspa Orbit**, alongside Kaspa Com Web Wallet,
+  Coinbase Wallet and WalletConnect. This proves wallet-picker discovery, not
+  connection or signing. One resource TLS handshake error was observed in an
+  earlier run; full page health is not established. No wallet option was selected
+  and no wallet connection, signature or transaction was approved.
 
-三平台打包和自动查询流程已验证；KaspaCom 的实际钱包选择、授权、签名和交易仍未验证。
+三平台打包、自动查询及 KaspaCom 弹窗中的 Orbit 展示已验证；授权、签名和交易仍未验证。
 
 2026-09-10 update: official SilverScript v1.0.0 compilation probe and pinned
 engine checks passed (28 scenarios), together with 84 Node tests and the isolated

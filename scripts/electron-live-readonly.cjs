@@ -33,8 +33,12 @@ app.on('browser-window-created',(_event,window)=>{
     const picker=await page.executeJavaScript(`(async()=>{
      const button=[...document.querySelectorAll('button')].find(b=>b.checkVisibility()&&['连接','Connect','Connect Wallet'].includes(b.innerText.trim()));
      if(!button)throw Error('Observed connect control missing');button.click();
-     await new Promise(r=>setTimeout(r,1000));
-     return {text:document.body.innerText.slice(0,6000)};
+     // WalletConnect/AppKit components often render inside open shadow roots.
+     // Inspect only rendered text; never select a wallet or approve a request.
+     function snapshot(){const roots=[];let visited=0;function scan(root){for(const element of root.querySelectorAll('*')){if(++visited>20000)return;if(element.shadowRoot){roots.push({host:element.tagName,text:[...element.shadowRoot.children].filter(e=>!['STYLE','SCRIPT'].includes(e.tagName)).map(e=>e.innerText||'').join(' ').slice(0,4000)});scan(element.shadowRoot);}}}scan(document);return {text:document.body.innerText.slice(0,6000),shadowRoots:roots.slice(0,30)};}
+     let observation;
+     for(let i=0;i<30;i++){await new Promise(r=>setTimeout(r,200));observation=snapshot();if(JSON.stringify(observation).includes('Kaspa Orbit'))break;}
+     return observation;
     })()`);
     console.log('Wallet picker observation only: '+JSON.stringify(picker));
    }
