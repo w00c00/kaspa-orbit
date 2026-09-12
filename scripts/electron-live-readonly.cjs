@@ -1,7 +1,17 @@
-// Public-page smoke only. Fresh empty profile; never creates/unlocks a wallet.
-const {app,webContents}=require('electron');
+// Public-page smoke defaults to a locked empty profile.
+// --connect-empty explicitly creates an ephemeral unfunded wallet and permits
+// one exact-origin EVM address disclosure only; all signing approvals are denied.
+const {app,webContents,dialog}=require('electron');
 const profile=process.env.ORBIT_SMOKE_PROFILE,url=process.argv[2];
 if(!profile||!url||new URL(url).protocol!=='https:')throw Error('Use run-desktop-smoke.cjs --live https://public-dapp');
+const connectEmpty=process.argv.includes('--connect-empty');let approvals=0;
+if(connectEmpty){
+ if(new URL(url).origin!=='https://defi.kaspa.com'||!process.argv.includes('--wallet-picker'))throw Error('Empty-wallet connection is scoped to the KaspaCom picker');
+ dialog.showMessageBox=async(_window,options)=>{
+  const allowed=options.message==='https://defi.kaspa.com'&&options.detail==='Allow this site to see your evm address? / 允许网站查看钱包地址？'&&approvals===0;
+  if(allowed)approvals++;return {response:allowed?1:0};
+ };
+}
 app.setPath('userData',profile);app.setPath('sessionData',profile);
 let done=false;
 const timer=setTimeout(()=>finish(Error('Public page smoke timed out')),45000);
@@ -11,6 +21,10 @@ app.on('browser-window-created',(_event,window)=>{
   try{
    const state=await window.webContents.executeJavaScript("window.nexus.invoke('status')");
    if(!state.locked||state.exists)throw Error('Empty locked profile required');
+   if(connectEmpty){
+    const password=require('node:crypto').randomBytes(24).toString('hex');
+    await window.webContents.executeJavaScript(`(async()=>{await window.nexus.invoke('wallet-add',{name:'Disposable website test',password:${JSON.stringify(password)}});await window.nexus.invoke('unlock',{password:${JSON.stringify(password)}});return true;})()`);
+   }
    await window.webContents.executeJavaScript(`window.nexus.invoke('browse',{url:${JSON.stringify(url)}})`);
    const page=webContents.getAllWebContents().find(wc=>wc!==window.webContents&&wc.getURL().startsWith('https://'));
    if(!page)throw Error('Public page missing');
@@ -41,6 +55,17 @@ app.on('browser-window-created',(_event,window)=>{
      return observation;
     })()`);
     console.log('Wallet picker observation only: '+JSON.stringify(picker));
+    if(connectEmpty){
+     await page.executeJavaScript(`(()=>{function find(root){for(const button of root.querySelectorAll('button'))if(button.checkVisibility()&&button.innerText.trim()==='Kaspa Orbit')return button;for(const element of root.querySelectorAll('*'))if(element.shadowRoot){const button=find(element.shadowRoot);if(button)return button;}}const button=find(document);if(!button)throw Error('Observed Orbit wallet option missing');button.click();})()`);
+     for(let i=0;i<50&&!approvals;i++)await new Promise(r=>setTimeout(r,100));
+     const permissions=await window.webContents.executeJavaScript("window.nexus.invoke('permissions')");
+     const accounts=await page.executeJavaScript("window.ethereum.request({method:'eth_accounts'})");
+     if(approvals!==1||accounts.length!==1||!permissions.some(p=>p.origin==='https://defi.kaspa.com'&&p.family==='evm'))throw Error('Website connection not established');
+     await window.webContents.executeJavaScript("window.nexus.invoke('disconnect')");
+     if((await page.executeJavaScript("window.ethereum.request({method:'eth_accounts'})")).length)throw Error('Disconnect did not clear accounts');
+     await window.webContents.executeJavaScript("window.nexus.invoke('lock')");
+     console.log('PASS real KaspaCom picker initiated account permission; disconnect cleared accounts. Ephemeral empty wallet only; all other approvals denied.');
+    }
    }
    finish();
   }catch(error){finish(error);}

@@ -28,6 +28,22 @@ Recorded 2026-09-09. This is a development wallet, not a production-readiness cl
 
 三平台打包、自动查询及 KaspaCom 弹窗中的 Orbit 展示已验证；授权、签名和交易仍未验证。
 
+### 2026-09-12 KaspaCom account connection
+
+`node scripts/run-desktop-smoke.cjs --live https://defi.kaspa.com --wallet-picker --connect-empty`
+passed on the local Mac. Unlike the default read-only probe, this opt-in test
+creates an ephemeral unfunded wallet in the disposable profile, clicks the
+observed **Kaspa Orbit** option in the real site's shadow-root picker, and
+permits exactly one `https://defi.kaspa.com` EVM address-disclosure prompt.
+The actual site triggered that permission; the permission store and provider
+both reported the connection. Disconnect cleared provider accounts. All other
+approval prompts are denied. The process exited normally and its temporary
+profile was removed. No real user wallet, message signature, token approval or
+transaction was used. This proves the site's account-connection path, not
+swap execution, site-side account rendering or all network-switch flows.
+
+KaspaCom 实站发起的空钱包地址授权及断开已通过；签名、代币授权和交易不在本次验证范围。
+
 2026-09-10 update: official SilverScript v1.0.0 compilation probe and pinned
 engine checks passed (28 scenarios), together with 84 Node tests and the isolated
 Electron smoke. Passing an old upstream checkout to the runner was separately
