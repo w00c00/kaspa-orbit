@@ -19,3 +19,10 @@ test('disconnect and revoke invalidate pending permission reads',async()=>{
   const fresh=s.api.invoke('permissions');s.pending[2].resolve([]);assert.equal((await fresh).length,0);
  }
 });
+test('late recovery response is discarded after lock or wallet switch',async()=>{
+ for(const method of ['lock','wallet-select']){
+  const s=shell(),recovery=s.api.invoke('wallet-recovery'),change=s.api.invoke(method);
+  s.pending[0].resolve({phrase:'synthetic marker, not a seed'});await assert.rejects(recovery,/changed/);
+  s.pending[1].resolve(true);await change;
+ }
+});

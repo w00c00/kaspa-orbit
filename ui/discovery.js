@@ -8,7 +8,7 @@
    const job={context};this.jobs.set(kind,job);this.publish(kind,'loading');
    try{await this.load(kind);if(this.context()===context)this.publish(kind,'success');}
    catch(error){if(this.context()===context)this.publish(kind,'error',error.message);}
-   finally{this.last.set(kind,{context,time:this.now()});this.jobs.delete(kind);if(this.context()&&this.context()!==context)queueMicrotask(()=>this.tick(kind));}
+   finally{const active=this.context()===context;if(active)this.last.set(kind,{context,time:this.now()});else{this.last.delete(kind);this.publish(kind,'idle');}this.jobs.delete(kind);if(this.context()&&this.context()!==context)queueMicrotask(()=>this.tick(kind));}
   }
  }
  if(typeof module!=='undefined'){module.exports={Discovery};return;}
@@ -27,6 +27,7 @@
    const button=$(buttons[kind]);if(!button)return;
    let node=statusNodes[kind];if(!node){node=document.createElement('p');node.setAttribute('role','status');button.after(node);statusNodes[kind]=node;}
    button.disabled=state==='loading';
+   if(state==='idle'){node.textContent='';return;}
    node.hidden=(kind==='kaspa'&&walletFamily!=='kaspa')||(kind==='evm'&&walletFamily!=='evm');
    node.textContent=state==='loading'?'正在自动检索资产 / Discovering assets…':state==='error'?`查询失败，不代表没有资产 / Query failed, not zero holdings: ${error}`:`已更新 / Updated · ${new Date().toLocaleTimeString()}`;
   }

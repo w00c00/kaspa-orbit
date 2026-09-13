@@ -1,5 +1,12 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {Discovery}=require('../ui/discovery.js');
+test('hidden-window completion resets loading and does not cache an unseen result',async()=>{
+ let context='wallet',release,calls=0;const states=[];
+ const discovery=new Discovery({context:()=>context,load:()=>{calls++;return new Promise(r=>release=r);},publish:(...s)=>states.push(s)});
+ const pending=discovery.tick('kaspa');context=null;release();await pending;
+ assert.equal(states.at(-1)[1],'idle');context='wallet';const resumed=discovery.tick('kaspa');assert.equal(calls,2);release();await resumed;
+ assert.equal(states.at(-1)[1],'success');
+});
 test('asset discovery deduplicates, refreshes on context change and suppresses stale errors',async()=>{
  let context='wallet-a',release,calls=0;const states=[];
  const discovery=new Discovery({context:()=>context,load:async()=>{calls++;await new Promise(r=>release=r);if(calls===1)throw Error('old failure');},publish:(...s)=>states.push(s)});
